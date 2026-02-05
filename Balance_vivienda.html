@@ -297,7 +297,6 @@
             const [isFiltersOpen, setIsFiltersOpen] = useState(true);
             const [isKPIsOpen, setIsKPIsOpen] = useState(true);
             const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
-            const [activeTab, setActiveTab] = useState('analisis');
 
             // Filtros
             const [selectedYear, setSelectedYear] = useState(null);
@@ -373,9 +372,11 @@
                     if (interactiveFilters.comuna && d.Comuna !== interactiveFilters.comuna) return false;
                     if (interactiveFilters.tipoHogar && d.Tipo_hogar !== interactiveFilters.tipoHogar) return false;
                     if (interactiveFilters.educacion && d.Educacion !== interactiveFilters.educacion) return false;
+                    if (selectedGSE.length > 0 && !selectedGSE.includes(d.Grupo_socioeconomico)) return false;
+                    if (selectedDeficit.length > 0 && !selectedDeficit.includes(d.Componente_deficit)) return false;
                     return true;
                 });
-            }, [rawData, selectedProvincias, selectedComunas, interactiveFilters]);
+            }, [rawData, selectedProvincias, selectedComunas, interactiveFilters, selectedGSE, selectedDeficit]);
 
             const filteredData = useMemo(() => selectedYear ? filteredAll.filter(d => d.Año === selectedYear) : filteredAll, [filteredAll, selectedYear]);
 
@@ -438,28 +439,21 @@
                                 </div>
                             </div>
                             <div className="flex items-center gap-4">
-                                {activeTab === 'analisis' && (
-                                    <div className="relative">
-                                        <button onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)} className="flex items-center bg-gray-50 border border-gray-200 hover:border-blue-400 px-3 py-1.5 rounded-lg transition-colors">
-                                            <span className="text-xs font-bold text-gray-500 mr-2">AÑO</span>
-                                            <span className="text-sm font-bold text-blue-700">{selectedYear || '-'}</span>
-                                            <Icon name="chevron-down" size={14} className="ml-2 text-gray-400" />
-                                        </button>
-                                        {isYearDropdownOpen && (
-                                            <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-xl z-50">
-                                                {options.years.map(y => (
-                                                    <div key={y} className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-50 ${selectedYear === y ? 'font-bold text-blue-600 bg-blue-50' : 'text-gray-700'}`} onClick={() => { setSelectedYear(y); setIsYearDropdownOpen(false); }}>{y}</div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                                <Icon name="wifi" size={22} className="text-green-500" />
-                                <div className="flex bg-gray-100 p-1 rounded-lg">
-                                    {['analisis', 'comparacion'].map(t => (
-                                        <button key={t} onClick={() => setActiveTab(t)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === t ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>{t === 'analisis' ? 'Análisis' : 'Comparación'}</button>
-                                    ))}
+                                <div className="relative">
+                                    <button onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)} className="flex items-center bg-gray-50 border border-gray-200 hover:border-blue-400 px-3 py-1.5 rounded-lg transition-colors">
+                                        <span className="text-xs font-bold text-gray-500 mr-2">AÑO</span>
+                                        <span className="text-sm font-bold text-blue-700">{selectedYear || '-'}</span>
+                                        <Icon name="chevron-down" size={14} className="ml-2 text-gray-400" />
+                                    </button>
+                                    {isYearDropdownOpen && (
+                                        <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-xl z-50">
+                                            {options.years.map(y => (
+                                                <div key={y} className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-50 ${selectedYear === y ? 'font-bold text-blue-600 bg-blue-50' : 'text-gray-700'}`} onClick={() => { setSelectedYear(y); setIsYearDropdownOpen(false); }}>{y}</div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
+                                <Icon name="wifi" size={22} className="text-green-500" />
                             </div>
                         </div>
                     </header>
@@ -475,156 +469,159 @@
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
                                         <FilterDropdown label="Provincias" options={options.provincias} selected={selectedProvincias} onChange={p => { setSelectedProvincias(p); const next = []; p.forEach(x => next.push(...MAULE_STRUCTURE.provincias[x].map(c => c.nombre))); setSelectedComunas(next); }} />
                                         <FilterDropdown label="Comunas" options={options.comunas} selected={selectedComunas} onChange={setSelectedComunas} />
-                                        {activeTab !== 'analisis' && (
-                                            <>
-                                                <FilterDropdown label="G. Socioeconómico" options={options.gse} selected={selectedGSE} onChange={setSelectedGSE} />
-                                                <FilterDropdown label="Déficit" options={options.deficit} selected={selectedDeficit} onChange={setSelectedDeficit} />
-                                            </>
-                                        )}
+                                        <FilterDropdown label="G. Socioeconómico" options={options.gse} selected={selectedGSE} onChange={setSelectedGSE} />
+                                        <FilterDropdown label="Déficit" options={options.deficit} selected={selectedDeficit} onChange={setSelectedDeficit} />
                                     </div>
                                 </div>
                             )}
                         </div>
 
-                        {activeTab === 'analisis' ? (
-                            <div className="space-y-6 animate-in">
-                                <div className="flex flex-wrap items-center gap-2 mb-2">
-                                    <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-0.5 rounded border border-blue-200">DATOS AÑO {selectedYear}</span>
-                                    {Object.values(interactiveFilters).some(x => x) && (
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-gray-500 font-medium">Filtros activos:</span>
-                                            {Object.entries(interactiveFilters).map(([k, v]) => v && <span key={k} className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded border border-indigo-200 flex items-center gap-1">{v}<button onClick={() => toggleInteractive(k, v)}><Icon name="x" size={12} /></button></span>)}
-                                            <button onClick={clearInteractive} className="text-xs text-red-500 underline ml-2">Limpiar todo</button>
+                        <div className="space-y-6 animate-in">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-0.5 rounded border border-blue-200">DATOS AÑO {selectedYear}</span>
+                                {Object.values(interactiveFilters).some(x => x) && (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-500 font-medium">Filtros activos:</span>
+                                        {Object.entries(interactiveFilters).map(([k, v]) => v && <span key={k} className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded border border-indigo-200 flex items-center gap-1">{v}<button onClick={() => toggleInteractive(k, v)}><Icon name="x" size={12} /></button></span>)}
+                                        <button onClick={clearInteractive} className="text-xs text-red-500 underline ml-2">Limpiar todo</button>
+                                    </div>
+                                )}
+                            </div>
+                            <Card title="Déficit Habitacional Total" value={totalReq} icon="home" subtext={`${selectedComunas.length} Comunas`} />
+                            {kpi && (
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+                                    <div className="px-6 py-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 border-b" onClick={() => setIsKPIsOpen(!isKPIsOpen)}>
+                                        <h2 className="font-bold text-lg">Variación respecto a {kpi.hasPrev ? kpi.prevYear : 'año anterior'}</h2>
+                                        <Icon name={isKPIsOpen ? 'minimize-2' : 'maximize-2'} size={18} />
+                                    </div>
+                                    {isKPIsOpen && (
+                                        <div className="p-6 bg-slate-50/50">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                                <KPICard title="Déficit Habitacional Total" value={kpi.total.value} prevValue={kpi.hasPrev ? kpi.total.prev : null} isTotal />
+                                                {kpi.components.map(c => <KPICard key={c.name} title={c.name} value={c.value} prevValue={kpi.hasPrev ? c.prev : null} />)}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
-                                <Card title="Déficit Habitacional Total" value={totalReq} icon="home" subtext={`${selectedComunas.length} Comunas`} />
-                                {kpi && (
-                                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
-                                        <div className="px-6 py-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 border-b" onClick={() => setIsKPIsOpen(!isKPIsOpen)}>
-                                            <h2 className="font-bold text-lg">Variación respecto a {kpi.hasPrev ? kpi.prevYear : 'año anterior'}</h2>
-                                            <Icon name={isKPIsOpen ? 'minimize-2' : 'maximize-2'} size={18} />
-                                        </div>
-                                        {isKPIsOpen && (
-                                            <div className="p-6 bg-slate-50/50">
-                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                                    <KPICard title="Déficit Habitacional Total" value={kpi.total.value} prevValue={kpi.hasPrev ? kpi.total.prev : null} isTotal />
-                                                    {kpi.components.map(c => <KPICard key={c.name} title={c.name} value={c.value} prevValue={kpi.hasPrev ? c.prev : null} />)}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    <ChartCard title="Componentes del Déficit" icon="alert-circle" iconColor="text-amber-500">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={dataByDef}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                                <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
-                                                <YAxis /><RechartsTooltip formatter={fmt} />
-                                                <Bar dataKey="value" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={60} onClick={e => toggleInteractive('deficit', e.name)} cursor="pointer" />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </ChartCard>
-                                    <ChartCard title="Por Grupo Socioeconómico" icon="users" iconColor="text-emerald-500">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <Pie data={dataByGSE} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" onClick={e => toggleInteractive('gse', e.name)} cursor="pointer">
-                                                    {dataByGSE.map((e, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                                                </Pie>
-                                                <RechartsTooltip formatter={fmt} /><Legend verticalAlign="bottom" height={36} />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </ChartCard>
-                                </div>
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    <ChartCard title="Sexo del Jefe de Hogar" icon="user" iconColor="text-indigo-500">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={dataBySexo}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                                <XAxis dataKey="name" tick={{ fontSize: 11 }} /><YAxis /><RechartsTooltip formatter={fmt} />
-                                                <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={60} onClick={e => toggleInteractive('sexo', e.name)} cursor="pointer">
-                                                    {dataBySexo.map((e, i) => <Cell key={i} fill={SEXO_COLORS[i % SEXO_COLORS.length]} />)}
-                                                </Bar>
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </ChartCard>
-                                    <ChartCard title="Por Zona (Urbano / Rural)" icon="tree-pine" iconColor="text-sky-500">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <Pie data={dataByZona} cx="50%" cy="50%" outerRadius={100} dataKey="value" onClick={e => toggleInteractive('zona', e.name)} cursor="pointer">
-                                                    {dataByZona.map((e, i) => <Cell key={i} fill={ZONA_COLORS[i % ZONA_COLORS.length]} />)}
-                                                </Pie>
-                                                <RechartsTooltip formatter={fmt} /><Legend verticalAlign="bottom" height={36} />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </ChartCard>
-                                </div>
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    <ChartCard title="Tipo de Hogar" icon="layout-list" iconColor="text-purple-500">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={dataByTipo} layout="vertical">
-                                                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                                <XAxis type="number" /><YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} interval={0} />
-                                                <RechartsTooltip formatter={fmt} /><Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} onClick={e => toggleInteractive('tipoHogar', e.name)} cursor="pointer" />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </ChartCard>
-                                    <ChartCard title="Nivel Educacional" icon="graduation-cap" iconColor="text-teal-500">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <Pie data={dataByEduc} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" onClick={e => toggleInteractive('educacion', e.name)} cursor="pointer">
-                                                    {dataByEduc.map((e, i) => <Cell key={i} fill={COLORS[(i + 3) % COLORS.length]} />)}
-                                                </Pie>
-                                                <RechartsTooltip formatter={fmt} /><Legend verticalAlign="bottom" height={36} />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </ChartCard>
-                                </div>
-                                <ChartCard title="Distribución Geográfica" icon="map" iconColor="text-blue-500" containerHeight="" customStyle={{ height: Math.max(350, dataByComuna.length * 40) + 'px' }}>
+                            )}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <ChartCard title="Componentes del Déficit" icon="alert-circle" iconColor="text-amber-500">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={dataByComuna} layout="vertical" margin={{ left: 40, right: 30 }}>
-                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                            <XAxis type="number" /><YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11 }} />
-                                            <RechartsTooltip formatter={fmt} /><Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} onClick={e => toggleInteractive('comuna', e.name)} cursor="pointer" />
+                                        <BarChart data={dataByDef}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
+                                            <YAxis /><RechartsTooltip formatter={fmt} />
+                                            <Bar dataKey="value" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={60} onClick={e => toggleInteractive('deficit', e.name)} cursor="pointer" />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </ChartCard>
+                                <ChartCard title="Por Grupo Socioeconómico" icon="users" iconColor="text-emerald-500">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie data={dataByGSE} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" onClick={e => toggleInteractive('gse', e.name)} cursor="pointer">
+                                                {dataByGSE.map((e, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                                            </Pie>
+                                            <RechartsTooltip formatter={fmt} /><Legend verticalAlign="bottom" height={36} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </ChartCard>
                             </div>
-                        ) : (
-                            <div className="space-y-6 animate-in">
-                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                                    <div className="flex justify-between items-end mb-6">
-                                        <div><h3 className="text-xl font-bold text-gray-800">Matriz Comparativa Anual</h3><p className="text-gray-500 text-sm">Evolución histórica por comuna.</p></div>
-                                        <div className="flex gap-2">{options.years.map((y, i) => <span key={y} className="text-xs font-bold px-2 py-1 rounded bg-gray-100" style={{ color: COLORS[i % COLORS.length] }}>● {y}</span>)}</div>
-                                    </div>
-                                    <div className="h-[500px] w-full">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={comparison} margin={{ bottom: 80 }}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} tick={{ fontSize: 10 }} /><YAxis /><RechartsTooltip formatter={v => new Intl.NumberFormat('es-CL').format(v)} /><Legend verticalAlign="top" />
-                                                {options.years.map((y, i) => <Bar key={y} dataKey={y} fill={COLORS[i % COLORS.length]} name={`Año ${y}`} radius={[2, 2, 0, 0]} />)}
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </div>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <ChartCard title="Sexo del Jefe de Hogar" icon="user" iconColor="text-indigo-500">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={dataBySexo}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <XAxis dataKey="name" tick={{ fontSize: 11 }} /><YAxis /><RechartsTooltip formatter={fmt} />
+                                            <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={60} onClick={e => toggleInteractive('sexo', e.name)} cursor="pointer">
+                                                {dataBySexo.map((e, i) => <Cell key={i} fill={SEXO_COLORS[i % SEXO_COLORS.length]} />)}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </ChartCard>
+                                <ChartCard title="Por Zona (Urbano / Rural)" icon="tree-pine" iconColor="text-sky-500">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie data={dataByZona} cx="50%" cy="50%" outerRadius={100} dataKey="value" onClick={e => toggleInteractive('zona', e.name)} cursor="pointer">
+                                                {dataByZona.map((e, i) => <Cell key={i} fill={ZONA_COLORS[i % ZONA_COLORS.length]} />)}
+                                            </Pie>
+                                            <RechartsTooltip formatter={fmt} /><Legend verticalAlign="bottom" height={36} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </ChartCard>
+                            </div>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <ChartCard title="Tipo de Hogar" icon="layout-list" iconColor="text-purple-500">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={dataByTipo} layout="vertical">
+                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                            <XAxis type="number" /><YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} interval={0} />
+                                            <RechartsTooltip formatter={fmt} /><Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} onClick={e => toggleInteractive('tipoHogar', e.name)} cursor="pointer" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </ChartCard>
+                                <ChartCard title="Nivel Educacional" icon="graduation-cap" iconColor="text-teal-500">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie data={dataByEduc} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" onClick={e => toggleInteractive('educacion', e.name)} cursor="pointer">
+                                                {dataByEduc.map((e, i) => <Cell key={i} fill={COLORS[(i + 3) % COLORS.length]} />)}
+                                            </Pie>
+                                            <RechartsTooltip formatter={fmt} /><Legend verticalAlign="bottom" height={36} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </ChartCard>
+                            </div>
+                            <ChartCard title="Distribución Geográfica" icon="map" iconColor="text-blue-500" containerHeight="" customStyle={{ height: Math.max(350, dataByComuna.length * 40) + 'px' }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={dataByComuna} layout="vertical" margin={{ left: 40, right: 30 }}>
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                        <XAxis type="number" /><YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11 }} />
+                                        <RechartsTooltip formatter={fmt} /><Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} onClick={e => toggleInteractive('comuna', e.name)} cursor="pointer" />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </ChartCard>
+
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
+                                    <h3 className="font-bold text-gray-700">Matriz Comparativa Anual por Comuna</h3>
+                                    <button className="text-blue-600 font-medium flex items-center gap-1"><Icon name="download" size={16} /> Exportar CSV</button>
                                 </div>
-                                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                                    <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-gray-700">Detalle de Datos</h3><button className="text-blue-600 font-medium flex items-center gap-1"><Icon name="download" size={16} /> Exportar CSV</button></div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm text-left text-gray-500">
-                                            <thead className="text-xs text-gray-700 uppercase bg-gray-50"><tr><th className="px-6 py-3">Provincia</th><th className="px-6 py-3">Comuna</th>{options.years.map(y => <th key={y} className="px-6 py-3 text-right">{y}</th>)}<th className="px-6 py-3 text-right">Variación</th></tr></thead>
-                                            <tbody>
-                                                {comparison.map((r, i) => {
-                                                    const v = options.years.map(y => r[y] || 0);
-                                                    const d = v[v.length - 1] - v[0];
-                                                    return (<tr key={i} className="bg-white border-b hover:bg-gray-50"><td className="px-6 py-4 font-medium text-gray-900">{r.provincia}</td><td className="px-6 py-4">{r.name}</td>{options.years.map(y => <td key={y} className="px-6 py-4 text-right font-mono">{r[y] ? r[y].toLocaleString('es-CL') : '-'}</td>)}<td className={`px-6 py-4 text-right font-bold ${d > 0 ? 'text-red-500' : 'text-green-500'}`}>{v.length > 1 && (d > 0 ? '+' : '')}{d.toLocaleString('es-CL')}</td></tr>);
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left text-gray-500">
+                                        <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                                            <tr>
+                                                <th className="px-6 py-3">Provincia</th>
+                                                <th className="px-6 py-3">Comuna</th>
+                                                {options.years.map(y => <th key={y} className="px-6 py-3 text-right">{y}</th>)}
+                                                <th className="px-6 py-3 text-right">Variación ({options.years[options.years.length - 1]} vs {options.years[options.years.length - 2] || '-'})</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {comparison.map((r, i) => {
+                                                const v = options.years.map(y => r[y] || 0);
+                                                const last = v[v.length - 1] || 0;
+                                                const prev = v[v.length - 2] || 0;
+                                                const d = last - prev;
+                                                return (
+                                                    <tr key={i} className="bg-white border-b hover:bg-gray-50">
+                                                        <td className="px-6 py-4 font-medium text-gray-900">{r.provincia}</td>
+                                                        <td className="px-6 py-4">{r.name}</td>
+                                                        {options.years.map(y => <td key={y} className="px-6 py-4 text-right font-mono">{r[y] ? r[y].toLocaleString('es-CL') : '-'}</td>)}
+                                                        <td className={`px-6 py-4 text-right font-bold ${d > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                            {v.length > 1 && (d > 0 ? '+' : '')}{d.toLocaleString('es-CL')}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
-                        )}
+                        </div>
                     </main>
+
+                    <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-gray-400 text-sm">
+                        Plataforma de visualización de datos de vivienda región del Maule.
+                    </footer>
                 </div>
             );
         }

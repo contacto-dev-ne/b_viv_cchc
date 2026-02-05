@@ -423,7 +423,12 @@
             }, [filteredAll, selectedYear, options]);
 
             const totalReq = filteredData.reduce((a, c) => a + (c.Requerimientos || 0), 0);
-            const fmt = (v, n) => [`${new Intl.NumberFormat('es-CL').format(v)} (${((v / totalReq) * 100).toFixed(1).replace('.', ',')}%)`, n];
+            const fmt = (v, n) => {
+                const val = Number(v) || 0;
+                const total = Number(totalReq) || 0;
+                const pct = total > 0 ? ((val / total) * 100).toFixed(1).replace('.', ',') : '0';
+                return [`${new Intl.NumberFormat('es-CL').format(val)} (${pct}%)`, n];
+            };
             const aggregate = (key) => {
                 const m = {};
                 filteredData.forEach(d => { m[d[key] || 'N/A'] = (m[d[key] || 'N/A'] || 0) + (d.Requerimientos || 0); });
@@ -506,7 +511,20 @@
                             {isFiltersOpen && (
                                 <div className="p-4 pt-0 border-t border-gray-100 mt-2">
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 overflow-visible">
-                                        <FilterDropdown label="Provincias" options={options.provincias} selected={selectedProvincias} onChange={p => { setSelectedProvincias(p); const next = []; p.forEach(x => next.push(...MAULE_STRUCTURE.provincias[x].map(c => c.nombre))); setSelectedComunas(next); }} />
+                                        <FilterDropdown
+                                            label="Provincias"
+                                            options={options.provincias}
+                                            selected={selectedProvincias}
+                                            onChange={p => {
+                                                setSelectedProvincias(p);
+                                                const next = [];
+                                                p.forEach(x => {
+                                                    const provData = MAULE_STRUCTURE.provincias[x];
+                                                    if (provData) next.push(...provData.map(c => c.nombre));
+                                                });
+                                                setSelectedComunas(next);
+                                            }}
+                                        />
                                         <FilterDropdown label="Comunas" options={options.comunas} selected={selectedComunas} onChange={setSelectedComunas} />
                                         <FilterDropdown label="G. Socioeconómico" options={options.gse} selected={selectedGSE} onChange={setSelectedGSE} />
                                         <FilterDropdown label="Déficit" options={options.deficit} selected={selectedDeficit} onChange={setSelectedDeficit} />

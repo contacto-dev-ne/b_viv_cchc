@@ -5,12 +5,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Balance de Vivienda - Maule</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
         }
 
         .metric-card {
@@ -26,7 +42,6 @@
 <body class="bg-slate-50 text-slate-800">
     <div id="root"></div>
 
-    <!-- Carga de Librerías -->
     <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
@@ -35,195 +50,476 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
+        const {
+            BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip: RechartsTooltip, Legend, ResponsiveContainer,
+            PieChart, Pie, Cell
+        } = window.Recharts;
 
-        // CONFIGURACIÓN (Inyectada por GitHub Actions)
+        // CONFIGURACIÓN (GitHub Actions reemplazaría estos valores si existieran etiquetas)
         const CONFIG = {
             apiKey: 'AIzaSyDw1B16f6oMd3eA0JzFwMOVFA-NBbhnUqo',
             spreadsheetId: '1QPTgiF-DE_wjxw-CXBMUtAEVEmoZfgPlU5h8hcfE8Eg',
             range: 'A:Z'
         };
 
-        const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
+        const MAULE_STRUCTURE = {
+            provincias: {
+                'Talca': [
+                    { nombre: 'Talca', cut: '7101' }, { nombre: 'Constitución', cut: '7102' }, { nombre: 'Curepto', cut: '7103' },
+                    { nombre: 'Empedrado', cut: '7104' }, { nombre: 'Maule', cut: '7105' }, { nombre: 'Pelarco', cut: '7106' },
+                    { nombre: 'Pencahue', cut: '7107' }, { nombre: 'Río Claro', cut: '7108' }, { nombre: 'San Clemente', cut: '7109' },
+                    { nombre: 'San Rafael', cut: '7110' }
+                ],
+                'Curicó': [
+                    { nombre: 'Curicó', cut: '7301' }, { nombre: 'Hualañé', cut: '7302' }, { nombre: 'Licantén', cut: '7303' },
+                    { nombre: 'Molina', cut: '7304' }, { nombre: 'Rauco', cut: '7305' }, { nombre: 'Romeral', cut: '7306' },
+                    { nombre: 'Sagrada Familia', cut: '7307' }, { nombre: 'Teno', cut: '7308' }, { nombre: 'Vichuquén', cut: '7309' }
+                ],
+                'Linares': [
+                    { nombre: 'Linares', cut: '7401' }, { nombre: 'Colbún', cut: '7402' }, { nombre: 'Longaví', cut: '7403' },
+                    { nombre: 'Parral', cut: '7404' }, { nombre: 'Retiro', cut: '7405' }, { nombre: 'San Javier', cut: '7406' },
+                    { nombre: 'Villa Alegre', cut: '7407' }, { nombre: 'Yerbas Buenas', cut: '7408' }
+                ],
+                'Cauquenes': [
+                    { nombre: 'Cauquenes', cut: '7201' }, { nombre: 'Chanco', cut: '7202' }, { nombre: 'Pelluhue', cut: '7203' }
+                ]
+            }
+        };
+
+        const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
+        const ZONA_COLORS = ['#0ea5e9', '#22c55e'];
+        const SEXO_COLORS = ['#6366f1', '#ec4899'];
+
+        // --- COMPONENTES UI ---
+
+        const Icon = ({ name, size = 18, color = "currentColor", className = "" }) => {
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} style={{ width: size, height: size, color: color }} className={className}></i>;
+        };
+
+        const KPICard = ({ title, value, prevValue, trend = 0, isTotal = false }) => {
+            const diff = prevValue ? value - prevValue : 0;
+            const percent = prevValue ? (diff / prevValue) * 100 : 0;
+            const isGood = diff <= 0;
+
+            return (
+                <div className={`bg-white rounded-2xl p-5 border ${isTotal ? 'border-indigo-200 ring-2 ring-indigo-50' : 'border-slate-100'} shadow-sm flex flex-col justify-between hover:shadow-md transition-all`}>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{title}</p>
+                        <h3 className={`font-black text-slate-800 ${isTotal ? 'text-4xl' : 'text-2xl'}`}>{value.toLocaleString('es-CL')}</h3>
+                    </div>
+                    {prevValue && (
+                        <div className="mt-4 flex items-center gap-2">
+                            <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isGood ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                {percent > 0 ? '+' : ''}{percent.toFixed(1)}%
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">vs año anterior</span>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const FilterGroup = ({ label, options, selected, onChange, single = false }) => {
+            const [isOpen, setIsOpen] = useState(false);
+            const toggle = (opt) => {
+                if (single) { onChange(opt); setIsOpen(false); return; }
+                const next = selected.includes(opt) ? selected.filter(i => i !== opt) : [...selected, opt];
+                onChange(next);
+            };
+            return (
+                <div className="relative group">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">{label}</label>
+                    <button onClick={() => setIsOpen(!isOpen)} className="w-full bg-white border border-slate-200 hover:border-indigo-400 px-3 py-2 rounded-xl text-left text-sm font-semibold flex justify-between items-center transition-all shadow-sm">
+                        <span className="truncate">{single ? (selected || 'Seleccionar') : (selected.length === options.length ? 'Todos' : `${selected.length} selec.`)}</span>
+                        <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} size={14} className="text-slate-400" />
+                    </button>
+                    {isOpen && (
+                        <div className="absolute top-full left-0 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 py-2 max-h-60 overflow-y-auto custom-scrollbar">
+                            {!single && (
+                                <div onClick={() => onChange(selected.length === options.length ? [] : options)} className="px-4 py-2 text-xs font-bold text-indigo-600 border-b border-slate-50 cursor-pointer hover:bg-indigo-50">
+                                    {selected.length === options.length ? 'Limpiar Todo' : 'Seleccionar Todo'}
+                                </div>
+                            )}
+                            {options.map(opt => (
+                                <div key={opt} onClick={() => toggle(opt)} className="px-4 py-2 hover:bg-slate-50 cursor-pointer flex items-center gap-3 text-sm font-medium text-slate-600">
+                                    {!single && <div className={`w-4 h-4 rounded border flex items-center justify-center ${selected.includes(opt) ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
+                                        {selected.includes(opt) && <Icon name="check" size={10} color="white" />}
+                                    </div>}
+                                    {single && selected === opt && <Icon name="check" size={14} className="text-indigo-600" />}
+                                    <span className={((single && selected === opt) || (!single && selected.includes(opt))) ? 'text-indigo-600 font-bold' : ''}>{opt}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const ChartBox = ({ title, icon, children, height = "h-80" }) => (
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative group overflow-hidden">
+                <div className="flex items-center gap-3 mb-6 relative z-10">
+                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                        <Icon name={icon} size={20} />
+                    </div>
+                    <h3 className="font-bold text-slate-800 tracking-tight">{title}</h3>
+                </div>
+                <div className={`${height} relative z-10`}>
+                    {children}
+                </div>
+                <div className="absolute -right-4 -bottom-4 opacity-[0.03] text-indigo-600 pointer-events-none">
+                    <Icon name={icon} size={150} />
+                </div>
+            </div>
+        );
+
+        // --- APP PRINCIPAL ---
 
         function App() {
-            const [data, setData] = useState([]);
+            const [rawData, setRawData] = useState([]);
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
+            const [activeTab, setActiveTab] = useState('analisis');
+
+            // Filtros Globales
             const [selectedYear, setSelectedYear] = useState(null);
+            const [selectedProvincias, setSelectedProvincias] = useState([]);
+            const [selectedComunas, setSelectedComunas] = useState([]);
+            const [selectedGSE, setSelectedGSE] = useState([]);
+            const [selectedDeficit, setSelectedDeficit] = useState([]);
 
-            // Extraer componentes de Recharts de forma segura dentro del componente
-            const {
-                BarChart, Bar, XAxis, YAxis, CartesianGrid,
-                Tooltip: RechartsTooltip, Legend, ResponsiveContainer,
-                PieChart, Pie, Cell
-            } = window.Recharts;
-
-            // Efecto para inicializar iconos de Lucide
-            useEffect(() => {
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
+            // Filtros Interactivos
+            const [interactive, setInteractive] = useState({
+                sexo: null, zona: null, gse: null, deficit: null, tipoHogar: null, educacion: null
             });
 
             useEffect(() => {
-                const loadData = async () => {
-                    // Validar si las keys fueron inyectadas correctamente
-                    if (CONFIG.spreadsheetId.includes('{{')) {
-                        setError("Error: Las llaves API no han sido inyectadas. Verifica GitHub Actions.");
-                        setLoading(false);
-                        return;
-                    }
-
+                const load = async () => {
                     try {
-                        const URL = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.spreadsheetId}/values/${CONFIG.range}?key=${CONFIG.apiKey}`;
+                        const URL = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.spreadsheetId}/values/${CONFIG.range}?key=${CONFIG.apiKey}&valueRenderOption=UNFORMATTED_VALUE`;
                         const res = await fetch(URL);
-
-                        if (!res.ok) {
-                            const errorBody = await res.json();
-                            throw new Error(errorBody.error?.message || "No se pudo conectar con la hoja.");
-                        }
+                        if (!res.ok) throw new Error("Error HTTP " + res.status);
 
                         const result = await res.json();
                         const rows = result.values;
-                        if (!rows || rows.length < 2) throw new Error("La hoja no contiene datos.");
+                        if (!rows || rows.length < 2) throw new Error("Hoja sin datos validos");
 
                         const headers = rows[0].map(h => h.trim());
-                        const parsedData = rows.slice(1).map(row => {
+                        const parsed = rows.slice(1).map(row => {
                             const obj = {};
                             headers.forEach((h, i) => {
                                 let val = row[i];
-                                if (['Año', 'Requerimientos'].includes(h)) val = Number(val);
+                                if (['Año', 'Requerimientos', 'req_1_8', 'req_2_1', 'req_2_2'].includes(h)) val = Number(val);
                                 obj[h] = val;
                             });
+
+                            // Auto-deteccion de Provincia
+                            if (!obj.Provincia) {
+                                for (const [p, coms] of Object.entries(MAULE_STRUCTURE.provincias)) {
+                                    if (coms.find(c => c.nombre === obj.Comuna || c.cut === String(obj['Código _comuna']))) { obj.Provincia = p; break; }
+                                }
+                            }
                             return obj;
                         });
 
-                        setData(parsedData);
-                        const years = [...new Set(parsedData.map(d => d.Año))].sort((a, b) => b - a);
-                        setSelectedYear(years[0] || 2024);
+                        setRawData(parsed);
+                        const years = [...new Set(parsed.map(d => d.Año))].sort((a, b) => b - a);
+                        setSelectedYear(years[0]);
+                        setSelectedProvincias(Object.keys(MAULE_STRUCTURE.provincias));
+                        setSelectedComunas([...new Set(parsed.map(d => d.Comuna))].sort());
+                        setSelectedGSE([...new Set(parsed.map(d => d.Grupo_socioeconomico))].filter(Boolean));
+                        setSelectedDeficit([...new Set(parsed.map(d => d.Componente_deficit))].filter(Boolean));
                     } catch (err) {
                         setError(err.message);
                     } finally {
                         setLoading(false);
                     }
                 };
-                loadData();
+                load();
             }, []);
 
-            const filteredData = useMemo(() => {
-                return data.filter(d => d.Año === selectedYear);
-            }, [data, selectedYear]);
+            // Opciones dinámicas
+            const options = useMemo(() => ({
+                years: [...new Set(rawData.map(d => d.Año))].sort((a, b) => b - a),
+                provincias: Object.keys(MAULE_STRUCTURE.provincias),
+                comunas: [...new Set(rawData.map(d => d.Comuna))].sort(),
+                gse: [...new Set(rawData.map(d => d.Grupo_socioeconomico))].filter(Boolean).sort(),
+                deficit: [...new Set(rawData.map(d => d.Componente_deficit))].filter(Boolean).sort()
+            }), [rawData]);
 
-            const stats = useMemo(() => {
-                const res = { total: 0, gse: {}, deficit: {} };
-                filteredData.forEach(d => {
-                    const req = Number(d.Requerimientos) || 0;
-                    res.total += req;
-                    if (d.Grupo_socioeconomico) res.gse[d.Grupo_socioeconomico] = (res.gse[d.Grupo_socioeconomico] || 0) + req;
-                    if (d.Componente_deficit) res.deficit[d.Componente_deficit] = (res.deficit[d.Componente_deficit] || 0) + req;
+            // Motor de Filtrado
+            const filteredDataWithoutYear = useMemo(() => {
+                return rawData.filter(d => {
+                    if (selectedProvincias.length > 0 && !selectedProvincias.includes(d.Provincia)) return false;
+                    if (selectedComunas.length > 0 && !selectedComunas.includes(d.Comuna)) return false;
+                    if (selectedGSE.length > 0 && !selectedGSE.includes(d.Grupo_socioeconomico)) return false;
+                    if (selectedDeficit.length > 0 && !selectedDeficit.includes(d.Componente_deficit)) return false;
+
+                    if (interactive.sexo && d.Sexo !== interactive.sexo) return false;
+                    if (interactive.zona && d.Zona !== interactive.zona) return false;
+                    if (interactive.tipoHogar && d.Tipo_hogar !== interactive.tipoHogar) return false;
+                    if (interactive.educacion && d.Educacion !== interactive.educacion) return false;
+                    if (interactive.gse && d.Grupo_socioeconomico !== interactive.gse) return false;
+                    if (interactive.deficit && d.Componente_deficit !== interactive.deficit) return false;
+
+                    return true;
                 });
+            }, [rawData, selectedProvincias, selectedComunas, selectedGSE, selectedDeficit, interactive]);
+
+            const filteredDataByYear = useMemo(() => {
+                return filteredDataWithoutYear.filter(d => d.Año === selectedYear);
+            }, [filteredDataWithoutYear, selectedYear]);
+
+            // Agregaciones
+            const stats = useMemo(() => {
+                const map = { total: 0, gse: {}, deficit: {}, zona: {}, sexo: {}, tipo: {}, educacion: {} };
+                filteredDataByYear.forEach(d => {
+                    const r = d.Requerimientos || 0;
+                    map.total += r;
+                    map.gse[d.Grupo_socioeconomico] = (map.gse[d.Grupo_socioeconomico] || 0) + r;
+                    map.deficit[d.Componente_deficit] = (map.deficit[d.Componente_deficit] || 0) + r;
+                    map.zona[d.Zona] = (map.zona[d.Zona] || 0) + r;
+                    map.sexo[d.Sexo] = (map.sexo[d.Sexo] || 0) + r;
+                    map.tipo[d.Tipo_hogar] = (map.tipo[d.Tipo_hogar] || 0) + r;
+                    map.educacion[d.Educacion] = (map.educacion[d.Educacion] || 0) + r;
+                });
+
+                // Variación vs año anterior
+                const prevYear = options.years[options.years.indexOf(selectedYear) + 1];
+                const totalPrev = rawData.filter(d => d.Año === prevYear).reduce((a, c) => a + (c.Requerimientos || 0), 0);
+
                 return {
-                    total: res.total,
-                    gseData: Object.entries(res.gse).map(([name, value]) => ({ name, value })),
-                    deficitData: Object.entries(res.deficit).map(([name, value]) => ({ name, value }))
+                    total: map.total,
+                    totalPrev: totalPrev || null,
+                    gse: Object.entries(map.gse).map(([name, value]) => ({ name, value })),
+                    deficit: Object.entries(map.deficit).map(([name, value]) => ({ name, value })),
+                    zona: Object.entries(map.zona).map(([name, value]) => ({ name, value })),
+                    sexo: Object.entries(map.sexo).map(([name, value]) => ({ name, value })),
+                    tipo: Object.entries(map.tipo).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value),
+                    educacion: Object.entries(map.educacion).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
                 };
-            }, [filteredData]);
+            }, [filteredDataByYear, selectedYear, options.years, rawData]);
 
             if (loading) return (
-                <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
+                    <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-6"></div>
                     <div className="text-center">
-                        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                        <p className="font-bold text-slate-500">Conectando con Google Sheets...</p>
+                        <h2 className="text-xl font-black text-slate-800 tracking-tight">Cargando Inteligencia Territorial</h2>
+                        <p className="text-slate-400 text-sm mt-2">Conectando con Google Cloud Infrastructure...</p>
                     </div>
                 </div>
             );
 
             if (error) return (
-                <div className="min-h-screen flex items-center justify-center bg-red-50 p-6">
-                    <div className="bg-white p-8 rounded-3xl shadow-xl max-w-lg w-full text-center">
-                        <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <i data-lucide="alert-triangle"></i>
+                <div className="min-h-screen flex items-center justify-center bg-rose-50 p-6">
+                    <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl max-w-lg w-full text-center border border-rose-100">
+                        <div className="w-20 h-20 bg-rose-100 text-rose-600 rounded-3xl flex items-center justify-center mx-auto mb-8 transform -rotate-6">
+                            <Icon name="alert-triangle" size={40} />
                         </div>
-                        <h2 className="text-2xl font-bold text-slate-800 mb-2">Error de Datos</h2>
-                        <p className="text-red-500 mb-6">{error}</p>
-                        <div className="text-xs text-left bg-slate-50 p-4 rounded-xl font-mono text-slate-500">
-                            <strong>Debug Info:</strong><br />
-                            ID: {CONFIG.spreadsheetId}<br />
-                            Status: Connection Failed
+                        <h2 className="text-3xl font-black text-slate-800 mb-4 tracking-tighter">Fallo de Conexión</h2>
+                        <p className="text-slate-500 mb-8 leading-relaxed">No pudimos sincronizar los datos. Verifica los permisos de la hoja de cálculo o la API Key en GitHub Secrets.</p>
+                        <div className="text-xs text-left bg-slate-50 p-6 rounded-2xl font-mono text-slate-400 mb-8 break-all border border-slate-100 italic">
+                            Error: {error}<br />ID: {CONFIG.spreadsheetId}
                         </div>
-                        <button onClick={() => window.location.reload()} className="mt-6 w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all">Reintentar</button>
+                        <button onClick={() => window.location.reload()} className="w-full py-4 bg-rose-600 text-white font-black rounded-2xl hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 uppercase tracking-widest text-xs">Reintentar Sincronización</button>
                     </div>
                 </div>
             );
 
             return (
-                <div className="min-h-screen pb-20">
-                    <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-                        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-indigo-600 text-white rounded-lg">
-                                    <i data-lucide="layout-dashboard" size="20"></i>
+                <div className="min-h-screen flex flex-col bg-slate-50">
+                    {/* TOP BAR */}
+                    <nav className="bg-white border-b border-slate-100 sticky top-0 z-[60] py-4 px-6 md:px-10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+                        <div className="flex items-center gap-5">
+                            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+                                <Icon name="home" size={26} />
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-black text-slate-800 tracking-tighter leading-none">Balance Vivienda Maule</h1>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-2">Unidad de Estudios CChC</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center bg-slate-100 p-1.5 rounded-2xl">
+                            <button onClick={() => setActiveTab('analisis')} className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'analisis' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}>Estadísticas</button>
+                            <button onClick={() => setActiveTab('comparacion')} className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'comparacion' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}>Comparativa</button>
+                        </div>
+
+                        <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100">
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                            <span className="text-[10px] font-black uppercase tracking-widest">Live Cloud Data</span>
+                        </div>
+                    </nav>
+
+                    <div className="flex-1 max-w-[1600px] mx-auto w-full p-6 md:p-10 grid grid-cols-1 lg:grid-cols-4 gap-10">
+                        {/* SIDEBAR FILTERS */}
+                        <aside className="lg:col-span-1 space-y-8 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm h-fit sticky top-32">
+                            <div className="flex items-center justify-between">
+                                <h2 className="font-black text-slate-800 tracking-tight flex items-center gap-2"><Icon name="sliders" size={18} /> Filtros</h2>
+                                <button onClick={() => setInteractive({})} className="text-[10px] font-black text-indigo-600 uppercase hover:underline">Limpiar</button>
+                            </div>
+
+                            <div className="space-y-6">
+                                <FilterGroup label="Año de Estudio" options={options.years} selected={selectedYear} onChange={setSelectedYear} single />
+                                <FilterGroup label="Provincia" options={options.provincias} selected={selectedProvincias} onChange={(p) => {
+                                    setSelectedProvincias(p);
+                                    const nextComs = [];
+                                    p.forEach(pr => nextComs.push(...MAULE_STRUCTURE.provincias[pr].map(c => c.nombre)));
+                                    setSelectedComunas(nextComs);
+                                }} />
+                                <FilterGroup label="Comuna" options={options.comunas} selected={selectedComunas} onChange={setSelectedComunas} />
+                                <FilterGroup label="Segmento GSE" options={options.gse} selected={selectedGSE} onChange={setSelectedGSE} />
+                                <FilterGroup label="Tipo de Déficit" options={options.deficit} selected={selectedDeficit} onChange={setSelectedDeficit} />
+                            </div>
+
+                            <div className="pt-6 border-t border-slate-50">
+                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Información Local</div>
+                                <div className="p-4 bg-slate-50 rounded-2xl flex items-center gap-4">
+                                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 shadow-sm"><Icon name="map" size={18} /></div>
+                                    <div className="text-xs font-bold text-slate-600">{selectedComunas.length} de 30 comunas</div>
                                 </div>
-                                <h1 className="font-bold text-slate-800">Balance Vivienda Maule</h1>
                             </div>
-                            <div className="flex items-center gap-4">
-                                <span className="text-xs font-bold text-slate-400">FILTRAR POR AÑO:</span>
-                                <select
-                                    className="bg-slate-100 border-none rounded-lg px-3 py-1.5 font-bold text-indigo-600 outline-none focus:ring-2 focus:ring-indigo-500"
-                                    value={selectedYear}
-                                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                                >
-                                    {[...new Set(data.map(d => d.Año))].sort((a, b) => b - a).map(y => <option key={y} value={y}>{y}</option>)}
-                                </select>
+                        </aside>
+
+                        {/* MAIN CONTENT */}
+                        <section className="lg:col-span-3 space-y-8">
+                            {activeTab === 'analisis' ? (
+                                <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                                    {/* KPIS */}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <KPICard title="Déficit Habitacional" value={stats.total} prevValue={stats.totalPrev} isTotal />
+                                        <div className="md:col-span-2 bg-indigo-600 rounded-[2rem] p-8 text-white relative overflow-hidden shadow-xl shadow-indigo-100">
+                                            <div className="relative z-10 flex flex-col justify-center h-full">
+                                                <h3 className="text-2xl font-black tracking-tighter">Región del Maule</h3>
+                                                <p className="mt-2 text-indigo-100 text-sm max-w-sm">Análisis detallado de los requerimientos de vivienda según encuesta CASEN y registros regionales.</p>
+                                                <div className="mt-6 flex gap-4">
+                                                    <div className="px-4 py-2 bg-white/10 backdrop-blur-md rounded-xl text-[10px] font-black uppercase tracking-widest">30 Comunas</div>
+                                                    <div className="px-4 py-2 bg-white/10 backdrop-blur-md rounded-xl text-[10px] font-black uppercase tracking-widest">Datos Oficiales</div>
+                                                </div>
+                                            </div>
+                                            <div className="absolute right-0 top-0 h-full w-1/2 opacity-20 pointer-events-none">
+                                                <Icon name="activity" size={200} className="absolute -top-10 -right-10" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* CHARTS GRID */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <ChartBox title="Distribución por Déficit" icon="alert-circle">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={stats.deficit}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} interval={0} />
+                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                                                    <RechartsTooltip contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }} cursor={{ fill: '#f8fafc' }} />
+                                                    <Bar dataKey="value" fill="#4f46e5" radius={[10, 10, 2, 2]} barSize={40} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </ChartBox>
+
+                                        <ChartBox title="Déficit por GSE" icon="pie-chart">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart>
+                                                    <Pie data={stats.gse} innerRadius={70} outerRadius={110} paddingAngle={8} dataKey="value" stroke="none">
+                                                        {stats.gse.map((e, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} cornerRadius={8} />)}
+                                                    </Pie>
+                                                    <RechartsTooltip contentStyle={{ borderRadius: '20px', border: 'none' }} />
+                                                    <Legend verticalAlign="bottom" align="center" iconType="circle" />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        </ChartBox>
+
+                                        <ChartBox title="Contexto Geográfico (Zona)" icon="map">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart>
+                                                    <Pie data={stats.zona} cx="50%" cy="50%" outerRadius={100} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                                                        {stats.zona.map((e, i) => <Cell key={i} fill={ZONA_COLORS[i % ZONA_COLORS.length]} />)}
+                                                    </Pie>
+                                                    <RechartsTooltip />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        </ChartBox>
+
+                                        <ChartBox title="Sexo del Jefe de Hogar" icon="user">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={stats.sexo} layout="vertical">
+                                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                                                    <XAxis type="number" axisLine={false} hide />
+                                                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700 }} width={80} />
+                                                    <RechartsTooltip />
+                                                    <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={25}>
+                                                        {stats.sexo.map((e, i) => <Cell key={i} fill={SEXO_COLORS[i % SEXO_COLORS.length]} />)}
+                                                    </Bar>
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </ChartBox>
+                                    </div>
+
+                                    {/* LARGE CHARTS */}
+                                    {stats.tipo.length > 0 && (
+                                        <ChartBox title="Déficit según Tipología de Hogar" icon="layers" height="h-[500px]">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={stats.tipo} layout="vertical" margin={{ left: 20 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                                                    <XAxis type="number" hide />
+                                                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 600 }} width={150} />
+                                                    <Bar dataKey="value" fill="#8b5cf6" radius={[0, 10, 10, 0]} barSize={35} />
+                                                    <RechartsTooltip cursor={{ fill: '#f8fafc' }} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </ChartBox>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
+                                    <div className="p-10 border-b border-slate-50">
+                                        <h3 className="text-2xl font-black text-slate-800 tracking-tighter">Tabla Comparativa Comunal</h3>
+                                        <p className="text-sm text-slate-400 mt-1">Desglose secuencial por año de los requerimientos de vivienda.</p>
+                                    </div>
+                                    <div className="overflow-x-auto custom-scrollbar">
+                                        <table className="w-full text-left">
+                                            <thead>
+                                                <tr className="bg-slate-50">
+                                                    <th className="px-10 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Comuna</th>
+                                                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Provincia</th>
+                                                    {options.years.map(y => <th key={y} className="px-6 py-5 text-[10px] font-black text-indigo-600 uppercase tracking-widest text-right">{y}</th>)}
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50">
+                                                {[...new Set(filteredDataWithoutYear.map(d => d.Comuna))].sort().map(com => {
+                                                    const prov = rawData.find(d => d.Comuna === com)?.Provincia || 'N/A';
+                                                    return (
+                                                        <tr key={com} className="hover:bg-slate-50/50 transition-colors group">
+                                                            <td className="px-10 py-5 font-bold text-slate-700 group-hover:text-indigo-600 transition-colors uppercase text-xs">{com}</td>
+                                                            <td className="px-6 py-5 text-center">
+                                                                <span className="px-3 py-1 bg-slate-100 rounded-full text-[9px] font-black text-slate-400 uppercase">{prov}</span>
+                                                            </td>
+                                                            {options.years.map(y => {
+                                                                const val = rawData.filter(d => d.Comuna === com && d.Año === y).reduce((a, c) => a + (c.Requerimientos || 0), 0);
+                                                                return <td key={y} className={`px-6 py-5 text-right font-black text-sm ${val > 0 ? 'text-slate-800' : 'text-slate-200'}`}>{val > 0 ? val.toLocaleString('es-CL') : '-'}</td>
+                                                            })}
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+                    </div>
+
+                    <footer className="mt-20 py-16 bg-white border-t border-slate-100 px-10 text-center">
+                        <div className="flex flex-col items-center gap-6">
+                            <div className="w-10 h-1bg-slate-200 rounded-full"></div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Cámara Chilena de la Construcción - Sede Maule</p>
+                            <div className="flex gap-10 opacity-30 grayscale items-center">
+                                <Icon name="activity" size={24} />
+                                <Icon name="database" size={24} />
+                                <Icon name="shield-check" size={24} />
                             </div>
                         </div>
-                    </header>
-
-                    <main className="max-w-7xl mx-auto px-6 mt-8 space-y-6">
-                        {/* KPI CARD */}
-                        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 text-center relative overflow-hidden group">
-                            <div className="absolute top-0 left-0 w-2 h-full bg-indigo-600"></div>
-                            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">Déficit Habitacional Total {selectedYear}</p>
-                            <h2 className="text-6xl font-black text-slate-800 tracking-tight">{stats.total.toLocaleString('es-CL')}</h2>
-                            <p className="text-xs text-slate-400 mt-4 italic">Fuente: Actualización Dinámica Google Sheets</p>
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-[450px]">
-                                <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                    <i data-lucide="bar-chart-3" className="text-indigo-600"></i> Componentes del Déficit
-                                </h3>
-                                <ResponsiveContainer width="100%" height="85%">
-                                    <BarChart data={stats.deficitData}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis dataKey="name" fontSize={10} axisLine={false} tickLine={false} />
-                                        <YAxis fontSize={10} axisLine={false} tickLine={false} />
-                                        <RechartsTooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                                        <Bar dataKey="value" fill="#4f46e5" radius={[6, 6, 0, 0]} barSize={40} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-[450px]">
-                                <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                    <i data-lucide="pie-chart" className="text-indigo-600"></i> Distribución por GSE
-                                </h3>
-                                <ResponsiveContainer width="100%" height="85%">
-                                    <PieChart>
-                                        <Pie data={stats.gseData} innerRadius={80} outerRadius={120} paddingAngle={5} dataKey="value">
-                                            {stats.gseData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                                        </Pie>
-                                        <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none' }} />
-                                        <Legend verticalAlign="bottom" align="center" />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-                    </main>
-
-                    <footer className="mt-20 py-10 border-t border-slate-200 text-center text-slate-400 text-xs uppercase tracking-widest">
-                        <p>© 2024 Cámara Chilena de la Construcción - Maule</p>
                     </footer>
                 </div>
             );

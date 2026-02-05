@@ -104,15 +104,31 @@
         const ZONA_COLORS = ['#0ea5e9', '#22c55e'];
         const SEXO_COLORS = ['#6366f1', '#ec4899'];
 
-        // --- COMPONENTE ICONO (REACT-SAFE) ---
-        // Esta versión entrega el SVG directamente evitando que Lucide manipule el DOM
-        // y rompa el ciclo de renderizado de React.
+        // --- COMPONENTE ICONO (REACT-SAFE & ROBUSTO) ---
         const Icon = ({ name, size = 18, color = "currentColor", className = "" }) => {
-            const iconData = window.lucide?.icons ? window.lucide.icons[name] : null;
+            const [ready, setReady] = useState(!!(window.lucide && window.lucide.icons));
+
+            useEffect(() => {
+                if (!ready) {
+                    const timer = setInterval(() => {
+                        if (window.lucide && window.lucide.icons) {
+                            setReady(true);
+                            clearInterval(timer);
+                        }
+                    }, 50);
+                    return () => clearInterval(timer);
+                }
+            }, [ready]);
+
+            const iconData = ready ? window.lucide.icons[name] : null;
 
             if (!iconData) {
-                // Fallback si la librería aún no carga
-                return <span style={{ width: size, height: size, display: 'inline-block' }} className={className}></span>;
+                return (
+                    <div
+                        style={{ width: size, height: size, minWidth: size, minHeight: size }}
+                        className={`inline-block ${className}`}
+                    ></div>
+                );
             }
 
             return (
@@ -127,7 +143,7 @@
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     className={className}
-                    style={{ minWidth: size, minHeight: size }}
+                    style={{ minWidth: size, minHeight: size, display: 'inline-block', verticalAlign: 'middle' }}
                 >
                     {iconData.map(([tag, attrs], i) => React.createElement(tag, { ...attrs, key: i }))}
                 </svg>
@@ -235,7 +251,7 @@
                         </h3>
                         <button
                             onClick={() => downloadChartImage(ref, title)}
-                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 flex items-center justify-center bg-gray-50 md:bg-transparent"
                             title="Guardar gráfico como imagen"
                         >
                             <Icon name="camera" size={20} />
@@ -586,9 +602,16 @@
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 <ChartCard title="Componentes del Déficit" icon="alert-circle" iconColor="text-amber-500">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={dataByDef}>
+                                        <BarChart data={dataByDef} margin={{ bottom: 20 }}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                            <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
+                                            <XAxis
+                                                dataKey="name"
+                                                tick={{ fontSize: 10 }}
+                                                interval={0}
+                                                angle={window.innerWidth < 768 ? -45 : 0}
+                                                textAnchor={window.innerWidth < 768 ? "end" : "middle"}
+                                                height={60}
+                                            />
                                             <YAxis /><RechartsTooltip formatter={fmt} />
                                             <Bar dataKey="value" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={60} onClick={e => toggleInteractive('deficit', e.name)} cursor="pointer" />
                                         </BarChart>

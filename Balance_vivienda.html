@@ -115,40 +115,67 @@
         // --- UTILIDAD: DESCARGA IMAGEN ---
         const downloadChartImage = (containerRef, title) => {
             if (!containerRef.current) return;
-            const svg = containerRef.current.querySelector('svg');
-            if (!svg) return;
+            // Intentar capturar el SVG del gráfico
+            const svgElement = containerRef.current.querySelector('.recharts-responsive-container svg');
+            if (!svgElement) {
+                console.error("No se encontró el SVG del gráfico");
+                return;
+            }
 
+            // Clonar el SVG para no modificar el original
+            const clonedSvg = svgElement.cloneNode(true);
+            const width = svgElement.clientWidth || 800;
+            const height = svgElement.clientHeight || 400;
+
+            // Asegurar dimensiones y estilos en el clon
+            clonedSvg.setAttribute('width', width);
+            clonedSvg.setAttribute('height', height);
+
+            // Serializar
             const serializer = new XMLSerializer();
-            let source = serializer.serializeToString(svg);
-            if (!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
-            if (!source.match(/^<svg[^>]+xmlns:xlink="http\:\/\/www\.w3\.org\/1999\/xlink"/)) source = source.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+            let svgString = serializer.serializeToString(clonedSvg);
 
-            const svgBlob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+            // Corregir namespaces si faltan
+            if (!svgString.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
+                svgString = svgString.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+            }
+            if (!svgString.match(/^<svg[^>]+xmlns:xlink="http\:\/\/www\.w3\.org\/1999\/xlink"/)) {
+                svgString = svgString.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+            }
+
+            const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
             const url = URL.createObjectURL(svgBlob);
             const img = new Image();
+
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                const titleHeight = 40;
+                const scale = 2; // Para mejor calidad
+                const titleHeight = 60;
                 const padding = 20;
-                const svgRect = svg.getBoundingClientRect();
-                const width = svgRect.width + (padding * 2);
-                const height = svgRect.height + titleHeight + (padding * 2);
-                const scale = 2;
-                canvas.width = width * scale;
-                canvas.height = height * scale;
+
+                canvas.width = (width + padding * 2) * scale;
+                canvas.height = (height + titleHeight + padding * 2) * scale;
+
                 const ctx = canvas.getContext('2d');
                 ctx.scale(scale, scale);
+
+                // Fondo blanco
                 ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, width, height);
-                ctx.font = 'bold 16px sans-serif';
-                ctx.fillStyle = '#1f2937';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Título
+                ctx.font = 'bold 20px Inter, sans-serif';
+                ctx.fillStyle = '#1e293b';
                 ctx.textAlign = 'center';
-                ctx.textBaseline = 'top';
-                ctx.fillText(title, width / 2, padding);
-                ctx.drawImage(img, padding, titleHeight + padding, svgRect.width, svgRect.height);
+                ctx.fillText(title, (width + padding * 2) / 2, padding + 25);
+
+                // Dibujar el gráfico
+                ctx.drawImage(img, padding, titleHeight + padding, width, height);
+
+                // Descargar
                 const a = document.createElement('a');
                 a.download = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`;
-                a.href = canvas.toDataURL('image/png');
+                a.href = canvas.toDataURL('image/png', 1.0);
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
@@ -459,14 +486,14 @@
                     </header>
 
                     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-visible relative z-40">
                             <div className="p-4 flex justify-between items-center cursor-pointer hover:bg-gray-50" onClick={() => setIsFiltersOpen(!isFiltersOpen)}>
                                 <div className="flex items-center gap-2 text-gray-700"><Icon name="filter" size={18} /><h2 className="font-semibold">Segmentación de Datos</h2></div>
                                 <Icon name={isFiltersOpen ? 'minimize-2' : 'maximize-2'} size={16} className="text-gray-400" />
                             </div>
                             {isFiltersOpen && (
                                 <div className="p-4 pt-0 border-t border-gray-100 mt-2">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 overflow-visible">
                                         <FilterDropdown label="Provincias" options={options.provincias} selected={selectedProvincias} onChange={p => { setSelectedProvincias(p); const next = []; p.forEach(x => next.push(...MAULE_STRUCTURE.provincias[x].map(c => c.nombre))); setSelectedComunas(next); }} />
                                         <FilterDropdown label="Comunas" options={options.comunas} selected={selectedComunas} onChange={setSelectedComunas} />
                                         <FilterDropdown label="G. Socioeconómico" options={options.gse} selected={selectedGSE} onChange={setSelectedGSE} />
@@ -580,10 +607,31 @@
                                 </ResponsiveContainer>
                             </ChartCard>
 
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-visible">
                                 <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
                                     <h3 className="font-bold text-gray-700">Matriz Comparativa Anual por Comuna</h3>
-                                    <button className="text-blue-600 font-medium flex items-center gap-1"><Icon name="download" size={16} /> Exportar CSV</button>
+                                    <button
+                                        onClick={() => {
+                                            const headers = ["Provincia", "Comuna", ...options.years, "Variacion"];
+                                            const csvRows = [headers.join(",")];
+                                            comparison.forEach(r => {
+                                                const v = options.years.map(y => r[y] || 0);
+                                                const d = (v[v.length - 1] || 0) - (v[v.length - 2] || 0);
+                                                const row = [r.provincia, r.name, ...v, d];
+                                                csvRows.push(row.join(","));
+                                            });
+                                            const blob = new Blob([csvRows.join("\n")], { type: 'text/csv;charset=utf-8;' });
+                                            const link = document.createElement("a");
+                                            link.href = URL.createObjectURL(blob);
+                                            link.setAttribute("download", "balance_vivienda_maule.csv");
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            document.body.removeChild(link);
+                                        }}
+                                        className="text-blue-600 font-medium flex items-center gap-1 hover:text-blue-800 transition-colors"
+                                    >
+                                        <Icon name="download" size={16} /> Exportar CSV
+                                    </button>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm text-left text-gray-500">

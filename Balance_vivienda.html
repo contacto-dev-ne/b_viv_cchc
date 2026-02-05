@@ -104,7 +104,7 @@
         const ZONA_COLORS = ['#0ea5e9', '#22c55e'];
         const SEXO_COLORS = ['#6366f1', '#ec4899'];
 
-        // --- COMPONENTE ICONO (REACT-SAFE & ROBUSTO) ---
+        // --- COMPONENTE ICONO (SOLUCIÓN DEFINITIVA) ---
         const Icon = ({ name, size = 18, color = "currentColor", className = "" }) => {
             const [ready, setReady] = useState(!!(window.lucide && window.lucide.icons));
 
@@ -120,15 +120,21 @@
                 }
             }, [ready]);
 
-            const iconData = ready ? window.lucide.icons[name] : null;
+            // Normalizar nombre a PascalCase para que coincida con Lucide (ej: 'alert-circle' -> 'AlertCircle')
+            const getIconData = (n) => {
+                if (!window.lucide || !window.lucide.icons) return null;
+                // Intentar PascalCase
+                const pascal = n.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('');
+                if (window.lucide.icons[pascal]) return window.lucide.icons[pascal];
+                // Intentar lowercase directo
+                if (window.lucide.icons[n]) return window.lucide.icons[n];
+                return null;
+            };
+
+            const iconData = ready ? getIconData(name) : null;
 
             if (!iconData) {
-                return (
-                    <div
-                        style={{ width: size, height: size, minWidth: size, minHeight: size }}
-                        className={`inline-block ${className}`}
-                    ></div>
-                );
+                return <div style={{ width: size, height: size, minWidth: size, minHeight: size, display: 'inline-block' }} className={className}></div>;
             }
 
             return (

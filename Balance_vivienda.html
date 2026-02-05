@@ -231,17 +231,17 @@
         // --- COMPONENTES UI ---
 
         const Card = ({ title, value, icon: iconName, subtext, color = "blue" }) => (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-start justify-between relative overflow-hidden">
-                <div className={`absolute top-0 right-0 p-4 opacity-10 text-${color}-500`}>
-                    <Icon name={iconName} size={64} />
-                </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-start justify-between relative overflow-hidden transition-all hover:shadow-md">
                 <div>
                     <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
-                    <h3 className="text-3xl font-bold text-gray-800">{value.toLocaleString('es-CL')}</h3>
-                    {subtext && <p className={`text-xs mt-2 font-medium text-${color}-600`}>{subtext}</p>}
+                    <div className="flex items-baseline gap-2">
+                        <h3 className="text-3xl font-bold text-gray-800">{value.toLocaleString('es-CL')}</h3>
+                        <span className="text-xs text-gray-400 font-medium">hogares</span>
+                    </div>
+                    {subtext && <p className={`text-xs mt-3 font-semibold text-${color}-600 bg-${color}-50 px-2.5 py-1 rounded-full inline-block border border-${color}-100`}>{subtext}</p>}
                 </div>
-                <div className={`p-3 bg-${color}-50 rounded-lg text-${color}-600 z-10`}>
-                    <Icon name={iconName} size={24} />
+                <div className={`p-4 bg-${color}-50 rounded-xl text-${color}-600 shadow-sm border border-${color}-100`}>
+                    <Icon name={iconName} size={28} />
                 </div>
             </div>
         );

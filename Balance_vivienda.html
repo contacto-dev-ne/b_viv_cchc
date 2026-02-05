@@ -7,7 +7,7 @@
     <title>Balance de Vivienda - Maule</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
     <style>
         body {
@@ -31,13 +31,6 @@
             background: #94a3b8;
         }
 
-        .line-clamp-2 {
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
         @keyframes fade-in {
             from {
                 opacity: 0;
@@ -56,7 +49,7 @@
     </style>
 </head>
 
-<body class="bg-[#f8fafc] text-slate-800">
+<body class="bg-slate-50 text-slate-800">
     <div id="root"></div>
 
     <!-- Librerías Externas -->
@@ -74,7 +67,9 @@
             PieChart, Pie, Cell
         } = window.Recharts;
 
-        // --- CONFIGURACIÓN ---
+        /**
+         * CONFIGURACIÓN PARA GITHUB ACTIONS
+         */
         const CONFIG = {
             apiKey: '{{VITE_GOOGLE_API_KEY}}',
             spreadsheetId: '{{VITE_HOUSING_SHEET_ID}}',
@@ -83,10 +78,25 @@
 
         const MAULE_STRUCTURE = {
             provincias: {
-                'Talca': ['Talca', 'Constitución', 'Curepto', 'Empedrado', 'Maule', 'Pelarco', 'Pencahue', 'Río Claro', 'San Clemente', 'San Rafael'],
-                'Curicó': ['Curicó', 'Hualañé', 'Licantén', 'Molina', 'Rauco', 'Romeral', 'Sagrada Familia', 'Teno', 'Vichuquén'],
-                'Linares': ['Linares', 'Colbún', 'Longaví', 'Parral', 'Retiro', 'San Javier', 'Villa Alegre', 'Yerbas Buenas'],
-                'Cauquenes': ['Cauquenes', 'Chanco', 'Pelluhue']
+                'Talca': [
+                    { nombre: 'Talca', cut: '7101' }, { nombre: 'Constitución', cut: '7102' }, { nombre: 'Curepto', cut: '7103' },
+                    { nombre: 'Empedrado', cut: '7104' }, { nombre: 'Maule', cut: '7105' }, { nombre: 'Pelarco', cut: '7106' },
+                    { nombre: 'Pencahue', cut: '7107' }, { nombre: 'Río Claro', cut: '7108' }, { nombre: 'San Clemente', cut: '7109' },
+                    { nombre: 'San Rafael', cut: '7110' },
+                ],
+                'Curicó': [
+                    { nombre: 'Curicó', cut: '7301' }, { nombre: 'Hualañé', cut: '7302' }, { nombre: 'Licantén', cut: '7303' },
+                    { nombre: 'Molina', cut: '7304' }, { nombre: 'Rauco', cut: '7305' }, { nombre: 'Romeral', cut: '7306' },
+                    { nombre: 'Sagrada Familia', cut: '7307' }, { nombre: 'Teno', cut: '7308' }, { nombre: 'Vichuquén', cut: '7309' },
+                ],
+                'Linares': [
+                    { nombre: 'Linares', cut: '7401' }, { nombre: 'Colbún', cut: '7402' }, { nombre: 'Longaví', cut: '7403' },
+                    { nombre: 'Parral', cut: '7404' }, { nombre: 'Retiro', cut: '7405' }, { nombre: 'San Javier', cut: '7406' },
+                    { nombre: 'Villa Alegre', cut: '7407' }, { nombre: 'Yerbas Buenas', cut: '7408' },
+                ],
+                'Cauquenes': [
+                    { nombre: 'Cauquenes', cut: '7201' }, { nombre: 'Chanco', cut: '7202' }, { nombre: 'Pelluhue', cut: '7203' },
+                ]
             }
         };
 
@@ -94,116 +104,184 @@
         const ZONA_COLORS = ['#0ea5e9', '#22c55e'];
         const SEXO_COLORS = ['#6366f1', '#ec4899'];
 
-        // --- COMPONENTES UI ---
-
+        // --- COMPONENTE ICONO ---
         const Icon = ({ name, size = 18, color = "currentColor", className = "" }) => {
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
-            const lucideName = name.toLowerCase().replace(/([a-z])([A-Z])/g, '$1-$2');
-            return <i data-lucide={lucideName} style={{ width: size, height: size, color: color }} className={className}></i>;
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            }, [name]);
+            return <i data-lucide={name} style={{ width: size, height: size, color: color }} className={className}></i>;
         };
 
+        // --- UTILIDAD: DESCARGA IMAGEN ---
+        const downloadChartImage = (containerRef, title) => {
+            if (!containerRef.current) return;
+            const svg = containerRef.current.querySelector('svg');
+            if (!svg) return;
+
+            const serializer = new XMLSerializer();
+            let source = serializer.serializeToString(svg);
+            if (!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+            if (!source.match(/^<svg[^>]+xmlns:xlink="http\:\/\/www\.w3\.org\/1999\/xlink"/)) source = source.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+
+            const svgBlob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(svgBlob);
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const titleHeight = 40;
+                const padding = 20;
+                const svgRect = svg.getBoundingClientRect();
+                const width = svgRect.width + (padding * 2);
+                const height = svgRect.height + titleHeight + (padding * 2);
+                const scale = 2;
+                canvas.width = width * scale;
+                canvas.height = height * scale;
+                const ctx = canvas.getContext('2d');
+                ctx.scale(scale, scale);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, width, height);
+                ctx.font = 'bold 16px sans-serif';
+                ctx.fillStyle = '#1f2937';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText(title, width / 2, padding);
+                ctx.drawImage(img, padding, titleHeight + padding, svgRect.width, svgRect.height);
+                const a = document.createElement('a');
+                a.download = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`;
+                a.href = canvas.toDataURL('image/png');
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            };
+            img.src = url;
+        };
+
+        // --- COMPONENTES UI ---
+
         const Card = ({ title, value, icon: iconName, subtext, color = "blue" }) => (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-start justify-between relative overflow-hidden group hover:shadow-md transition-all">
-                <div className={`absolute top-0 right-0 p-4 opacity-10 text-${color}-500 transform group-hover:scale-110 transition-transform`}>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-start justify-between relative overflow-hidden">
+                <div className={`absolute top-0 right-0 p-4 opacity-10 text-${color}-500`}>
                     <Icon name={iconName} size={64} />
                 </div>
                 <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{title}</p>
-                    <h3 className="text-3xl font-black text-slate-800 tracking-tight">{value.toLocaleString('es-CL')}</h3>
-                    {subtext && <p className="text-[10px] mt-2 font-bold text-slate-400 uppercase">{subtext}</p>}
+                    <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
+                    <h3 className="text-3xl font-bold text-gray-800">{value.toLocaleString('es-CL')}</h3>
+                    {subtext && <p className={`text-xs mt-2 font-medium text-${color}-600`}>{subtext}</p>}
                 </div>
-                <div className={`p-3 bg-${color}-50 rounded-xl text-${color}-600 z-10`}>
+                <div className={`p-3 bg-${color}-50 rounded-lg text-${color}-600 z-10`}>
                     <Icon name={iconName} size={24} />
                 </div>
             </div>
         );
+
+        const ChartCard = ({ title, icon: iconName, iconColor, children, containerHeight = "h-80", customStyle = {} }) => {
+            const ref = useRef(null);
+            return (
+                <div ref={ref} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 relative group">
+                    <div className="flex justify-between items-start mb-4">
+                        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <Icon name={iconName} size={18} className={iconColor} />
+                            {title}
+                        </h3>
+                        <button
+                            onClick={() => downloadChartImage(ref, title)}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                            title="Guardar gráfico como imagen"
+                        >
+                            <Icon name="camera" size={20} />
+                        </button>
+                    </div>
+                    <div className={`w-full cursor-pointer ${containerHeight}`} style={customStyle}>
+                        {children}
+                    </div>
+                </div>
+            );
+        };
 
         const KPICard = ({ title, value, prevValue, isTotal = false }) => {
             const hasPrev = prevValue !== undefined && prevValue !== null;
             const diff = hasPrev ? value - prevValue : 0;
             const percent = hasPrev && prevValue !== 0 ? (diff / prevValue) * 100 : 0;
             const isGood = diff < 0;
+            const isNeutral = diff === 0;
+            const TrendIcon = isNeutral ? 'minus' : (isGood ? 'trending-down' : 'trending-up');
+            const trendColor = isNeutral ? 'text-gray-400' : (isGood ? 'text-green-500' : 'text-red-500');
+            const trendBg = isNeutral ? 'bg-gray-100' : (isGood ? 'bg-green-50' : 'bg-red-50');
 
             return (
-                <div className={`bg-white rounded-2xl shadow-sm border ${isTotal ? 'border-indigo-200 ring-2 ring-indigo-50' : 'border-slate-100'} p-5 flex flex-col justify-between transition-all hover:shadow-md h-full`}>
+                <div className={`bg-white rounded-xl shadow-sm border ${isTotal ? 'border-blue-200 ring-1 ring-blue-100' : 'border-gray-100'} p-5 flex flex-col justify-between relative overflow-hidden transition-all hover:shadow-md`}>
                     <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 h-8 line-clamp-2">{title}</p>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 h-8 line-clamp-2">{title}</p>
                         <div className="flex items-baseline gap-2">
-                            <h3 className={`font-black text-slate-800 ${isTotal ? 'text-3xl' : 'text-2xl'}`}>{value.toLocaleString('es-CL')}</h3>
-                            {isTotal && <span className="text-[10px] text-slate-400 font-bold uppercase">Hogares</span>}
+                            <h3 className={`font-bold text-gray-800 ${isTotal ? 'text-3xl' : 'text-2xl'}`}>{value.toLocaleString('es-CL')}</h3>
+                            {isTotal && <span className="text-xs text-gray-400 font-medium">hogares</span>}
                         </div>
                     </div>
-                    {hasPrev && (
+                    {hasPrev ? (
                         <div className="mt-4 flex items-center gap-2">
-                            <div className={`flex items-center px-2 py-0.5 rounded-full text-[10px] font-black ${isGood ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                {percent > 0 ? '+' : ''}{percent.toFixed(1)}%
+                            <div className={`flex items-center px-2 py-1 rounded-full text-xs font-bold ${trendColor} ${trendBg}`}>
+                                <Icon name={TrendIcon} size={14} className="mr-1" />
+                                {Math.abs(percent).toFixed(1)}%
                             </div>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase">vs año anterior</span>
+                            <span className="text-xs text-gray-400">
+                                {diff > 0 ? '+' : ''}{diff.toLocaleString('es-CL')} vs año anterior
+                            </span>
                         </div>
+                    ) : (
+                        <div className="mt-4 text-xs text-gray-300 italic">Sin datos previos</div>
                     )}
                 </div>
             );
         };
 
-        const ChartCard = ({ title, icon: iconName, iconColor, children, height = "h-80" }) => (
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 relative group">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className={`p-2 rounded-xl bg-slate-50 ${iconColor}`}>
-                        <Icon name={iconName} size={20} />
-                    </div>
-                    <h3 className="font-bold text-slate-800 tracking-tight">{title}</h3>
-                </div>
-                <div className={`${height} w-full`}>
-                    {children}
-                </div>
-            </div>
-        );
-
-        const FilterDropdown = ({ label, options, selected, onChange, placeholder = "Seleccionar...", single = false }) => {
+        const FilterDropdown = ({ label, options, selected, onChange, placeholder = "Seleccionar...", singleSelect = false }) => {
             const [isOpen, setIsOpen] = useState(false);
-            const ref = useRef(null);
-
-            useEffect(() => {
-                const handleClickOutside = (e) => { if (ref.current && !ref.current.contains(e.target)) setIsOpen(false); };
-                document.addEventListener("mousedown", handleClickOutside);
-                return () => document.removeEventListener("mousedown", handleClickOutside);
-            }, []);
-
-            const toggle = (opt) => {
-                if (single) { onChange(opt); setIsOpen(false); return; }
-                const next = selected.includes(opt) ? selected.filter(i => i !== opt) : [...selected, opt];
-                onChange(next);
+            const toggleOption = (option) => {
+                if (singleSelect) { onChange(option); setIsOpen(false); return; }
+                const isSelected = selected.includes(option);
+                const newSelected = isSelected ? selected.filter(item => item !== option) : [...selected, option];
+                onChange(newSelected);
             };
-
             const getLabel = () => {
-                if (single) return selected || placeholder;
-                return selected.length === 0 ? <span className="text-slate-400">{placeholder}</span> :
+                if (singleSelect) return selected || placeholder;
+                return selected.length === 0 ? <span className="text-gray-400">{placeholder}</span> :
                     selected.length === options.length ? `Todos (${options.length})` : `${selected.length} seleccionados`;
             };
-
             return (
-                <div className="relative w-full" ref={ref}>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.1em] mb-1.5 ml-1">{label}</label>
-                    <button onClick={() => setIsOpen(!isOpen)} className="w-full bg-white border border-slate-200 hover:border-indigo-400 text-left px-4 py-2.5 rounded-xl text-xs font-bold flex justify-between items-center shadow-sm transition-all focus:ring-2 focus:ring-indigo-100 outline-none">
-                        <span className="truncate">{getLabel()}</span>
-                        <Icon name={isOpen ? 'ChevronUp' : 'ChevronDown'} size={14} className="text-slate-400" />
+                <div className="relative w-full">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wider">{label}</label>
+                    <button
+                        onClick={() => setIsOpen(!isOpen)}
+                        className="w-full bg-white border border-gray-300 hover:border-blue-500 text-left px-3 py-2 rounded-lg text-sm flex justify-between items-center transition-colors shadow-sm"
+                    >
+                        <span className="truncate block pr-4">{getLabel()}</span>
+                        <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} />
                     </button>
                     {isOpen && (
-                        <div className="absolute z-[100] mt-2 w-full bg-white border border-slate-100 rounded-2xl shadow-xl py-2 max-h-60 overflow-y-auto custom-scrollbar animate-in">
-                            {!single && (
-                                <div onClick={() => onChange(selected.length === options.length ? [] : options)} className="px-4 py-2 text-[10px] font-black text-indigo-600 border-b border-slate-50 cursor-pointer hover:bg-slate-50 uppercase tracking-widest">
+                        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                            {!singleSelect && (
+                                <div
+                                    className="px-3 py-2 border-b border-gray-100 text-xs font-bold text-blue-600 cursor-pointer hover:bg-blue-50"
+                                    onClick={() => onChange(selected.length === options.length ? [] : options)}
+                                >
                                     {selected.length === options.length ? "Desmarcar todos" : "Seleccionar todos"}
                                 </div>
                             )}
-                            {options.map(opt => (
-                                <div key={opt} onClick={() => toggle(opt)} className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer flex items-center gap-3 text-xs font-semibold text-slate-600">
-                                    {!single && <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${selected.includes(opt) ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
-                                        {selected.includes(opt) && <Icon name="Check" size={10} color="white" />}
-                                    </div>}
-                                    {single && selected === opt && <Icon name="Check" size={14} className="text-indigo-600" />}
-                                    <span className={((single && selected === opt) || (!single && selected.includes(opt))) ? 'text-indigo-600 font-bold' : ''}>{opt}</span>
-                                </div>
-                            ))}
+                            {options.map((opt) => {
+                                const isSelected = singleSelect ? selected === opt : selected.includes(opt);
+                                return (
+                                    <div key={opt} className="px-3 py-2 hover:bg-gray-50 cursor-pointer flex items-center text-sm" onClick={() => toggleOption(opt)}>
+                                        {!singleSelect && (
+                                            <div className={`w-4 h-4 rounded border flex items-center justify-center mr-2 ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
+                                                {isSelected && <Icon name="check" size={12} color="white" />}
+                                            </div>
+                                        )}
+                                        {singleSelect && isSelected && <Icon name="check" size={16} className="text-blue-500 mr-2" />}
+                                        <span className={isSelected ? 'text-gray-900 font-medium' : 'text-gray-600'}>{opt}</span>
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -216,12 +294,10 @@
             const [rawData, setRawData] = useState([]);
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
-
-            // Estado UI
-            const [activeTab, setActiveTab] = useState('analisis');
             const [isFiltersOpen, setIsFiltersOpen] = useState(true);
             const [isKPIsOpen, setIsKPIsOpen] = useState(true);
-            const [isYearOpen, setIsYearOpen] = useState(false);
+            const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
+            const [activeTab, setActiveTab] = useState('analisis');
 
             // Filtros
             const [selectedYear, setSelectedYear] = useState(null);
@@ -229,430 +305,326 @@
             const [selectedComunas, setSelectedComunas] = useState([]);
             const [selectedGSE, setSelectedGSE] = useState([]);
             const [selectedDeficit, setSelectedDeficit] = useState([]);
-
-            const [interactive, setInteractive] = useState({
+            const [interactiveFilters, setInteractiveFilters] = useState({
                 sexo: null, zona: null, gse: null, deficit: null, comuna: null, tipoHogar: null, educacion: null
             });
 
+            const [options, setOptions] = useState({ years: [], provincias: [], comunas: [], gse: [], deficit: [] });
+
             useEffect(() => {
-                const load = async () => {
+                const fetchData = async () => {
                     try {
                         const URL = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.spreadsheetId}/values/${CONFIG.range}?key=${CONFIG.apiKey}&valueRenderOption=UNFORMATTED_VALUE`;
                         const res = await fetch(URL);
-                        if (!res.ok) throw new Error(`Error de conexión (Status ${res.status}). Verifica tus claves API.`);
-
+                        if (!res.ok) throw new Error('Error al conectar con Google Sheets.');
                         const result = await res.json();
                         const rows = result.values;
-                        if (!rows || rows.length < 2) throw new Error("La hoja está vacía o no tiene el formato correcto.");
-
+                        if (!rows) throw new Error('Sin datos');
                         const headers = rows[0].map(h => h.trim());
                         const parsed = rows.slice(1).map(row => {
                             const obj = {};
                             headers.forEach((h, i) => {
                                 let val = row[i];
-                                if (['Año', 'Requerimientos'].includes(h)) val = Number(val);
+                                if (['Requerimientos', 'Año'].includes(h)) val = Number(val);
                                 obj[h] = val;
                             });
-                            // Provincia mapping si no viene
                             if (!obj.Provincia) {
-                                for (const [p, coms] of Object.entries(MAULE_STRUCTURE.provincias)) {
-                                    if (coms.includes(obj.Comuna)) { obj.Provincia = p; break; }
+                                for (const [prov, comps] of Object.entries(MAULE_STRUCTURE.provincias)) {
+                                    if (comps.find(c => c.nombre === obj.Comuna)) { obj.Provincia = prov; break; }
                                 }
                             }
                             return obj;
                         });
-
                         setRawData(parsed);
-                        const years = [...new Set(parsed.map(d => d.Año))].sort((a, b) => b - a);
-                        setSelectedYear(years[0]);
-                        setSelectedProvincias(Object.keys(MAULE_STRUCTURE.provincias));
-                        setSelectedComunas([...new Set(parsed.map(d => d.Comuna))].sort());
-                        setSelectedGSE([...new Set(parsed.map(d => d.Grupo_socioeconomico))].filter(Boolean));
-                        setSelectedDeficit([...new Set(parsed.map(d => d.Componente_deficit))].filter(Boolean));
                     } catch (err) {
                         setError(err.message);
                     } finally {
                         setLoading(false);
                     }
                 };
-                load();
+                fetchData();
             }, []);
 
-            const options = useMemo(() => ({
-                years: [...new Set(rawData.map(d => d.Año))].sort((a, b) => b - a),
-                provincias: Object.keys(MAULE_STRUCTURE.provincias),
-                comunas: [...new Set(rawData.map(d => d.Comuna))].sort(),
-                gse: [...new Set(rawData.map(d => d.Grupo_socioeconomico))].filter(Boolean),
-                deficit: [...new Set(rawData.map(d => d.Componente_deficit))].filter(Boolean)
-            }), [rawData]);
+            useEffect(() => {
+                if (rawData.length > 0) {
+                    const years = [...new Set(rawData.map(d => d.Año))].sort((a, b) => a - b);
+                    const provs = Object.keys(MAULE_STRUCTURE.provincias);
+                    const coms = [...new Set(rawData.map(d => d.Comuna))].sort();
+                    const gse = [...new Set(rawData.map(d => d.Grupo_socioeconomico))].filter(Boolean);
+                    const def = [...new Set(rawData.map(d => d.Componente_deficit))].filter(Boolean);
+                    setOptions({ years, provincias: provs, comunas: coms, gse, deficit: def });
+                    if (!selectedYear) setSelectedYear(years.includes(2025) ? 2025 : years[years.length - 1]);
+                    if (selectedProvincias.length === 0) setSelectedProvincias(provs);
+                    if (selectedComunas.length === 0) setSelectedComunas(coms);
+                }
+            }, [rawData]);
+
+            const toggleInteractive = (cat, val) => setInteractiveFilters(p => ({ ...p, [cat]: p[cat] === val ? null : val }));
+            const clearInteractive = () => setInteractiveFilters({ sexo: null, zona: null, gse: null, deficit: null, comuna: null, tipoHogar: null, educacion: null });
 
             const filteredAll = useMemo(() => {
                 return rawData.filter(d => {
                     if (selectedProvincias.length > 0 && !selectedProvincias.includes(d.Provincia)) return false;
                     if (selectedComunas.length > 0 && !selectedComunas.includes(d.Comuna)) return false;
-                    if (selectedGSE.length > 0 && !selectedGSE.includes(d.Grupo_socioeconomico)) return false;
-                    if (selectedDeficit.length > 0 && !selectedDeficit.includes(d.Componente_deficit)) return false;
-
-                    if (interactive.sexo && d.Sexo !== interactive.sexo) return false;
-                    if (interactive.zona && d.Zona !== interactive.zona) return false;
-                    if (interactive.gse && d.Grupo_socioeconomico !== interactive.gse) return false;
-                    if (interactive.deficit && d.Componente_deficit !== interactive.deficit) return false;
-                    if (interactive.comuna && d.Comuna !== interactive.comuna) return false;
-                    if (interactive.tipoHogar && d.Tipo_hogar !== interactive.tipoHogar) return false;
-                    if (interactive.educacion && d.Educacion !== interactive.educacion) return false;
-
+                    if (interactiveFilters.sexo && d.Sexo !== interactiveFilters.sexo) return false;
+                    if (interactiveFilters.zona && d.Zona !== interactiveFilters.zona) return false;
+                    if (interactiveFilters.gse && d.Grupo_socioeconomico !== interactiveFilters.gse) return false;
+                    if (interactiveFilters.deficit && d.Componente_deficit !== interactiveFilters.deficit) return false;
+                    if (interactiveFilters.comuna && d.Comuna !== interactiveFilters.comuna) return false;
+                    if (interactiveFilters.tipoHogar && d.Tipo_hogar !== interactiveFilters.tipoHogar) return false;
+                    if (interactiveFilters.educacion && d.Educacion !== interactiveFilters.educacion) return false;
                     return true;
                 });
-            }, [rawData, selectedProvincias, selectedComunas, selectedGSE, selectedDeficit, interactive]);
+            }, [rawData, selectedProvincias, selectedComunas, interactiveFilters]);
 
-            const data = useMemo(() => filteredAll.filter(d => d.Año === selectedYear), [filteredAll, selectedYear]);
+            const filteredData = useMemo(() => selectedYear ? filteredAll.filter(d => d.Año === selectedYear) : filteredAll, [filteredAll, selectedYear]);
 
-            const stats = useMemo(() => {
-                if (!selectedYear) return null;
-                const total = data.reduce((a, c) => a + (c.Requerimientos || 0), 0);
-
-                // Variación
-                const sortedYears = [...options.years].reverse();
-                const curIdx = sortedYears.indexOf(selectedYear);
-                const prevYear = curIdx > 0 ? sortedYears[curIdx - 1] : null;
-                const totalPrev = prevYear ? filteredAll.filter(d => d.Año === prevYear).reduce((a, c) => a + (c.Requerimientos || 0), 0) : 0;
-
-                const aggregate = (key) => {
-                    const m = {};
-                    data.forEach(d => { m[d[key]] = (m[d[key]] || 0) + (d.Requerimientos || 0); });
-                    return Object.entries(m).map(([name, value]) => ({ name, value }));
-                };
-
-                const comps = options.deficit.map(c => {
-                    const v = data.filter(d => d.Componente_deficit === c).reduce((a, cr) => a + (cr.Requerimientos || 0), 0);
-                    const vp = prevYear ? filteredAll.filter(d => d.Año === prevYear && d.Componente_deficit === c).reduce((a, cr) => a + (cr.Requerimientos || 0), 0) : null;
-                    return { name: c, value: v, prev: vp };
-                });
-
+            const kpi = useMemo(() => {
+                if (!selectedYear || options.years.length === 0) return null;
+                const years = [...options.years].sort((a, b) => a - b);
+                const curIdx = years.indexOf(selectedYear);
+                const prevYear = curIdx > 0 ? years[curIdx - 1] : null;
+                const curData = filteredAll.filter(d => d.Año === selectedYear);
+                const prevData = prevYear ? filteredAll.filter(d => d.Año === prevYear) : [];
+                const sum = (d) => d.reduce((a, c) => a + (c.Requerimientos || 0), 0);
                 return {
-                    total, totalPrev,
-                    components: comps,
-                    hasPrev: !!prevYear,
-                    prevYear,
-                    deficit: aggregate('Componente_deficit'),
-                    gse: aggregate('Grupo_socioeconomico'),
-                    sexo: aggregate('Sexo'),
-                    zona: aggregate('Zona'),
-                    tipoHogar: aggregate('Tipo_hogar').sort((a, b) => b.value - a.value),
-                    educacion: aggregate('Educacion'),
-                    ranking: aggregate('Comuna').sort((a, b) => b.value - a.value)
+                    total: { value: sum(curData), prev: sum(prevData) },
+                    components: options.deficit.map(c => ({ name: c, value: sum(curData.filter(x => x.Componente_deficit === c)), prev: sum(prevData.filter(x => x.Componente_deficit === c)) })),
+                    prevYear, hasPrev: !!prevYear
                 };
-            }, [data, selectedYear, options, filteredAll]);
+            }, [filteredAll, selectedYear, options]);
 
-            const comparisonData = useMemo(() => {
-                const map = {};
+            const totalReq = filteredData.reduce((a, c) => a + (c.Requerimientos || 0), 0);
+            const fmt = (v, n) => [`${new Intl.NumberFormat('es-CL').format(v)} (${((v / totalReq) * 100).toFixed(1).replace('.', ',')}%)`, n];
+            const aggregate = (key) => {
+                const m = {};
+                filteredData.forEach(d => { m[d[key] || 'N/A'] = (m[d[key] || 'N/A'] || 0) + (d.Requerimientos || 0); });
+                return Object.entries(m).map(([name, value]) => ({ name, value }));
+            };
+
+            const dataByComuna = aggregate('Comuna').sort((a, b) => b.value - a.value);
+            const dataByGSE = aggregate('Grupo_socioeconomico');
+            const dataByZona = aggregate('Zona');
+            const dataBySexo = aggregate('Sexo');
+            const dataByTipo = aggregate('Tipo_hogar').sort((a, b) => b.value - a.value);
+            const dataByEduc = aggregate('Educacion').sort((a, b) => b.value - a.value);
+            const dataByDef = aggregate('Componente_deficit');
+
+            const comparison = useMemo(() => {
+                const m = {};
                 filteredAll.forEach(d => {
-                    if (!map[d.Comuna]) map[d.Comuna] = { name: d.Comuna, provincia: d.Provincia };
-                    map[d.Comuna][d.Año] = (map[d.Comuna][d.Año] || 0) + d.Requerimientos;
+                    if (!m[d.Comuna]) m[d.Comuna] = { name: d.Comuna, provincia: d.Provincia };
+                    m[d.Comuna][d.Año] = (m[d.Comuna][d.Año] || 0) + d.Requerimientos;
                 });
-                return Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
+                return Object.values(m).sort((a, b) => a.name.localeCompare(b.name));
             }, [filteredAll]);
 
             if (loading) return (
-                <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
-                    <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-6"></div>
-                    <h2 className="text-xl font-black text-slate-800 tracking-tight">Cargando Visualizador Maule</h2>
-                    <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-2">Sincronizando con Google Sheets...</p>
+                <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                    <p className="text-gray-600 font-medium">Cargando datos del Maule...</p>
                 </div>
             );
-
-            if (error) return (
-                <div className="min-h-screen flex items-center justify-center bg-rose-50 p-6 text-center">
-                    <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl border border-rose-100 max-w-lg w-full">
-                        <div className="w-20 h-20 bg-rose-100 text-rose-600 rounded-3xl flex items-center justify-center mx-auto mb-6 transform -rotate-6">
-                            <Icon name="Activity" size={40} />
-                        </div>
-                        <h2 className="text-2xl font-black text-slate-800 mb-2">Fallo de Conexión</h2>
-                        <p className="text-slate-500 text-sm mb-8 leading-relaxed">{error}</p>
-                        <div className="bg-slate-50 p-6 rounded-2xl text-[10px] font-mono text-slate-400 text-left border border-slate-100 italic break-all">
-                            Status: Connection Failed<br />ID: {CONFIG.spreadsheetId}
-                        </div>
-                        <button onClick={() => window.location.reload()} className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 text-xs uppercase tracking-widest">Reintentar Sincronización</button>
-                    </div>
-                </div>
-            );
-
-            const toggleInteractive = (cat, val) => setInteractive(p => ({ ...p, [cat]: p[cat] === val ? null : val }));
 
             return (
-                <div className="min-h-screen flex flex-col">
-                    {/* NAV BAR */}
-                    <nav className="bg-indigo-900 text-white px-6 md:px-12 py-5 sticky top-0 z-[100] border-b border-indigo-800/50 backdrop-blur-md bg-indigo-900/95 flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div className="flex items-center gap-6">
-                            <div className="bg-white p-2.5 rounded-xl shadow-lg border border-white/20">
-                                <img src="https://cchc.cl/documents/431409/0/logoCChC.png/002fea99-2039-beec-02a7-a92335532d6f?t=1695346405910" alt="Logo" className="h-8" />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-black tracking-tighter leading-none">Unidad de Estudios</h1>
-                                <p className="text-[10px] font-black text-indigo-300 uppercase tracking-[0.2em] mt-1.5">Región del Maule</p>
-                            </div>
-                        </div>
-
-                        <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 backdrop-blur-sm">
-                            <button onClick={() => setActiveTab('analisis')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'analisis' ? 'bg-white text-indigo-900 shadow-xl' : 'text-indigo-200 hover:text-white'}`}>Análisis Regional</button>
-                            <button onClick={() => setActiveTab('comparacion')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'comparacion' ? 'bg-white text-indigo-900 shadow-xl' : 'text-indigo-200 hover:text-white'}`}>Comparativa Anual</button>
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                            <div className="relative">
-                                <button onClick={() => setIsYearOpen(!isYearOpen)} className="flex items-center gap-3 bg-white/10 border border-white/10 hover:bg-white/20 px-4 py-2 rounded-xl transition-all">
-                                    <span className="text-[10px] font-black text-indigo-300 uppercase">Año</span>
-                                    <span className="text-sm font-black">{selectedYear}</span>
-                                    <Icon name="ChevronDown" size={14} className="text-indigo-400" />
-                                </button>
-                                {isYearOpen && (
-                                    <div className="absolute top-full right-0 mt-2 w-32 bg-white rounded-2xl shadow-2xl py-2 z-50 animate-in border border-slate-100">
-                                        {options.years.map(y => (
-                                            <div key={y} onClick={() => { setSelectedYear(y); setIsYearOpen(false); }} className={`px-4 py-2 text-xs font-bold cursor-pointer hover:bg-slate-50 ${selectedYear === y ? 'text-indigo-600 bg-indigo-50' : 'text-slate-600'}`}>{y}</div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                            <div className="w-10 h-10 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl flex items-center justify-center animate-pulse"><Icon name="Wifi" size={20} /></div>
-                        </div>
-                    </nav>
-
-                    <div className="flex-1 w-full max-w-[1600px] mx-auto p-6 md:p-10 grid grid-cols-1 lg:grid-cols-4 gap-10">
-                        {/* SIDEBAR */}
-                        <aside className="lg:col-span-1 space-y-8 h-fit lg:sticky lg:top-32">
-                            <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col gap-6">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="font-black text-slate-800 tracking-tight flex items-center gap-2"><Icon name="Sliders" size={18} /> Segmentación</h3>
-                                    <button onClick={() => { setInteractive({ sexo: null, zona: null, gse: null, deficit: null, comuna: null, tipoHogar: null, educacion: null }); setSelectedProvincias(options.provincias); setSelectedComunas(options.comunas); }} className="text-[10px] font-black text-indigo-600 uppercase hover:underline">Limpiar</button>
-                                </div>
-
-                                <FilterDropdown label="Provincia" options={options.provincias} selected={selectedProvincias} onChange={p => {
-                                    setSelectedProvincias(p);
-                                    let c = []; p.forEach(pr => c.push(...MAULE_STRUCTURE.provincias[pr]));
-                                    setSelectedComunas(c);
-                                }} />
-                                <FilterDropdown label="Comuna" options={options.comunas} selected={selectedComunas} onChange={setSelectedComunas} />
-                                <FilterDropdown label="Grupo Socioeconómico" options={options.gse} selected={selectedGSE} onChange={setSelectedGSE} />
-                                <FilterDropdown label="Componente Déficit" options={options.deficit} selected={selectedDeficit} onChange={setSelectedDeficit} />
-
-                                <div className="pt-6 border-t border-slate-50 flex flex-col gap-3">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Resumen Filtros</p>
-                                    <div className="p-4 bg-slate-50 rounded-2xl text-xs font-bold text-slate-600 border border-slate-100 flex items-center gap-3">
-                                        <Icon name="Map" size={18} className="text-slate-400" />
-                                        {selectedComunas.length} de 30 comunas
-                                    </div>
+                <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
+                    <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <img src="https://lh3.googleusercontent.com/d/1ox7eOnjJquQM2QbjZd92YO4l5OZrQmtg" alt="Logo CChC" className="h-14 w-auto object-contain mr-2" />
+                                <div>
+                                    <h1 className="text-xl font-bold text-gray-900 leading-tight">Balance de Vivienda</h1>
+                                    <p className="text-xs text-gray-500 font-medium tracking-wide">REGIÓN DEL MAULE</p>
                                 </div>
                             </div>
-                        </aside>
-
-                        {/* CONTENT */}
-                        <main className="lg:col-span-3 space-y-10">
-                            {activeTab === 'analisis' ? (
-                                <div className="space-y-10 animate-in">
-                                    {/* KPIS */}
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <KPICard title="Déficit Habitacional Total" value={stats.total} prevValue={stats.totalPrev} isTotal />
-                                        <div className="md:col-span-2 bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-800 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl shadow-indigo-100">
-                                            <div className="relative z-10 flex flex-col justify-center h-full">
-                                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-300">Panorama Regional</span>
-                                                <h3 className="text-4xl font-black tracking-tighter mt-2">Balance de Vivienda - Maule</h3>
-                                                <p className="text-indigo-100 text-sm mt-4 max-w-md leading-relaxed">Visualización técnica de los requerimientos de vivienda, segmentados por variables sociodemográficas y geográficas regionales.</p>
-                                                <div className="mt-8 flex gap-4">
-                                                    <div className="px-5 py-2.5 bg-white/10 backdrop-blur-xl rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/5 shadow-xl">Data Oficial</div>
-                                                    <div className="px-5 py-2.5 bg-white/10 backdrop-blur-xl rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/5 shadow-xl">Update CASEN</div>
-                                                </div>
-                                            </div>
-                                            <div className="absolute -right-20 -bottom-20 opacity-10 blur-2xl animate-pulse">
-                                                <Icon name="Home" size={400} />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* VARIACION POR COMPONENTES */}
-                                    <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-                                        <div onClick={() => setIsKPIsOpen(!isKPIsOpen)} className="p-6 border-b border-slate-50 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors">
-                                            <h3 className="font-black text-slate-800 tracking-tight flex items-center gap-3"><Icon name="TrendingUp" size={18} className="text-indigo-600" /> Variación por Componentes {stats.hasPrev ? `vs ${stats.prevYear}` : ''}</h3>
-                                            <Icon name={isKPIsOpen ? 'Minimize2' : 'Maximize2'} size={18} className="text-slate-400" />
-                                        </div>
-                                        {isKPIsOpen && (
-                                            <div className="p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50/30">
-                                                {stats.components.map(c => (
-                                                    <KPICard key={c.name} title={c.name} value={c.value} prevValue={c.prev} />
+                            <div className="flex items-center gap-4">
+                                {activeTab === 'analisis' && (
+                                    <div className="relative">
+                                        <button onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)} className="flex items-center bg-gray-50 border border-gray-200 hover:border-blue-400 px-3 py-1.5 rounded-lg transition-colors">
+                                            <span className="text-xs font-bold text-gray-500 mr-2">AÑO</span>
+                                            <span className="text-sm font-bold text-blue-700">{selectedYear || '-'}</span>
+                                            <Icon name="chevron-down" size={14} className="ml-2 text-gray-400" />
+                                        </button>
+                                        {isYearDropdownOpen && (
+                                            <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-xl z-50">
+                                                {options.years.map(y => (
+                                                    <div key={y} className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-50 ${selectedYear === y ? 'font-bold text-blue-600 bg-blue-50' : 'text-gray-700'}`} onClick={() => { setSelectedYear(y); setIsYearDropdownOpen(false); }}>{y}</div>
                                                 ))}
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* ROW 1: BAR + PIE */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                        <ChartCard title="Componentes del Déficit" icon="AlertCircle" iconColor="text-amber-500">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={stats.deficit}>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} interval={0} />
-                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                                                    <RechartsTooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.1)' }} />
-                                                    <Bar dataKey="value" fill="#f59e0b" radius={[12, 12, 2, 2]} barSize={50} onClick={e => toggleInteractive('deficit', e.name)} cursor="pointer" />
-                                                </BarChart>
-                                            </ResponsiveContainer>
-                                        </ChartCard>
-
-                                        <ChartCard title="Distribución por GSE" icon="Users" iconColor="text-emerald-500">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie data={stats.gse} innerRadius={80} outerRadius={120} paddingAngle={8} dataKey="value" stroke="none" onClick={e => toggleInteractive('gse', e.name)} cursor="pointer">
-                                                        {stats.gse.map((e, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} cornerRadius={8} />)}
-                                                    </Pie>
-                                                    <RechartsTooltip contentStyle={{ borderRadius: '24px', border: 'none' }} />
-                                                    <Legend verticalAlign="bottom" align="center" iconType="circle" />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </ChartCard>
-                                    </div>
-
-                                    {/* ROW 2: BAR + PIE */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                        <ChartCard title="Sexo del Jefe de Hogar" icon="User" iconColor="text-indigo-500">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={stats.sexo}>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700 }} />
-                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
-                                                    <RechartsTooltip />
-                                                    <Bar dataKey="value" radius={[10, 10, 2, 2]} barSize={60} onClick={e => toggleInteractive('sexo', e.name)} cursor="pointer">
-                                                        {stats.sexo.map((e, i) => <Cell key={i} fill={SEXO_COLORS[i % SEXO_COLORS.length]} />)}
-                                                    </Bar>
-                                                </BarChart>
-                                            </ResponsiveContainer>
-                                        </ChartCard>
-
-                                        <ChartCard title="Contexto Territorial (Zona)" icon="TreePine" iconColor="text-sky-500">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie data={stats.zona} cx="50%" cy="50%" outerRadius={110} dataKey="value" stroke="none" onClick={e => toggleInteractive('zona', e.name)} cursor="pointer">
-                                                        {stats.zona.map((e, i) => <Cell key={i} fill={ZONA_COLORS[i % ZONA_COLORS.length]} cornerRadius={10} />)}
-                                                    </Pie>
-                                                    <RechartsTooltip />
-                                                    <Legend />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </ChartCard>
-                                    </div>
-
-                                    {/* ROW 3: HORIZONTAL BAR + ANILLO */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                        <ChartCard title="Tipología de Hogar" icon="LayoutList" iconColor="text-purple-500">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={stats.tipoHogar} layout="vertical">
-                                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                                                    <XAxis type="number" hide />
-                                                    <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} />
-                                                    <RechartsTooltip />
-                                                    <Bar dataKey="value" fill="#8b5cf6" radius={[0, 8, 8, 0]} barSize={25} onClick={e => toggleInteractive('tipoHogar', e.name)} cursor="pointer" />
-                                                </BarChart>
-                                            </ResponsiveContainer>
-                                        </ChartCard>
-
-                                        <ChartCard title="Nivel Educacional" icon="GraduationCap" iconColor="text-teal-500">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie data={stats.educacion} innerRadius={70} outerRadius={110} paddingAngle={2} dataKey="value" stroke="none" onClick={e => toggleInteractive('educacion', e.name)} cursor="pointer">
-                                                        {stats.educacion.map((e, i) => <Cell key={i} fill={COLORS[(i + 3) % COLORS.length]} cornerRadius={10} />)}
-                                                    </Pie>
-                                                    <RechartsTooltip />
-                                                    <Legend verticalAlign="bottom" height={36} />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </ChartCard>
-                                    </div>
-
-                                    {/* RANKING COMUNAL */}
-                                    <ChartCard title="Distribución Geográfica (Ranking)" icon="Map" iconColor="text-indigo-600" height="h-[600px]">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={stats.ranking} layout="vertical" margin={{ right: 40 }}>
-                                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                                                <XAxis type="number" hide />
-                                                <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} />
-                                                <RechartsTooltip />
-                                                <Bar dataKey="value" fill="#3b82f6" radius={[0, 10, 10, 0]} barSize={30} onClick={e => toggleInteractive('comuna', e.name)} cursor="pointer" />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </ChartCard>
+                                )}
+                                <Icon name="wifi" size={22} className="text-green-500" />
+                                <div className="flex bg-gray-100 p-1 rounded-lg">
+                                    {['analisis', 'comparacion'].map(t => (
+                                        <button key={t} onClick={() => setActiveTab(t)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === t ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>{t === 'analisis' ? 'Análisis' : 'Comparación'}</button>
+                                    ))}
                                 </div>
-                            ) : (
-                                <div className="space-y-10 animate-in">
-                                    <div className="bg-white rounded-[3rem] border border-slate-100 shadow-xl overflow-hidden">
-                                        <div className="p-10 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-                                            <div>
-                                                <h3 className="text-3xl font-black text-slate-800 tracking-tighter">Matriz Comparativa Regional</h3>
-                                                <p className="text-slate-400 text-sm mt-1 uppercase font-bold tracking-widest">Evolución histórica de requerimientos habitacionales</p>
-                                            </div>
-                                            <div className="flex gap-4">
-                                                {options.years.map((y, i) => (
-                                                    <span key={y} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-white border border-slate-100 shadow-sm">
-                                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>
-                                                        {y}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <div className="overflow-x-auto custom-scrollbar">
-                                            <table className="w-full text-left">
-                                                <thead>
-                                                    <tr className="bg-slate-100/50">
-                                                        <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Provincia / Comuna</th>
-                                                        {options.years.map(y => <th key={y} className="px-6 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">{y}</th>)}
-                                                        <th className="px-10 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Variación Total</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-50">
-                                                    {comparisonData.map(row => {
-                                                        const vals = options.years.map(y => row[y] || 0);
-                                                        const diff = (vals[0] || 0) - (vals[vals.length - 1] || 0);
-                                                        const isGrowth = diff > 0;
-                                                        return (
-                                                            <tr key={row.name} className="hover:bg-slate-50/50 transition-colors group">
-                                                                <td className="px-10 py-5">
-                                                                    <div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">{row.provincia}</div>
-                                                                    <div className="text-sm font-black text-slate-700 uppercase group-hover:text-indigo-600 transition-colors">{row.name}</div>
-                                                                </td>
-                                                                {options.years.map(y => (
-                                                                    <td key={y} className="px-6 py-5 text-right font-black text-sm text-slate-800">
-                                                                        {row[y] ? row[y].toLocaleString('es-CL') : '-'}
-                                                                    </td>
-                                                                ))}
-                                                                <td className={`px-10 py-5 text-right font-black text-sm ${isGrowth ? 'text-rose-500' : 'text-emerald-500'}`}>
-                                                                    {diff !== 0 && (diff > 0 ? '+' : '')}{diff.toLocaleString('es-CL')}
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden">
+                            <div className="p-4 flex justify-between items-center cursor-pointer hover:bg-gray-50" onClick={() => setIsFiltersOpen(!isFiltersOpen)}>
+                                <div className="flex items-center gap-2 text-gray-700"><Icon name="filter" size={18} /><h2 className="font-semibold">Segmentación de Datos</h2></div>
+                                <Icon name={isFiltersOpen ? 'minimize-2' : 'maximize-2'} size={16} className="text-gray-400" />
+                            </div>
+                            {isFiltersOpen && (
+                                <div className="p-4 pt-0 border-t border-gray-100 mt-2">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
+                                        <FilterDropdown label="Provincias" options={options.provincias} selected={selectedProvincias} onChange={p => { setSelectedProvincias(p); const next = []; p.forEach(x => next.push(...MAULE_STRUCTURE.provincias[x].map(c => c.nombre))); setSelectedComunas(next); }} />
+                                        <FilterDropdown label="Comunas" options={options.comunas} selected={selectedComunas} onChange={setSelectedComunas} />
+                                        {activeTab !== 'analisis' && (
+                                            <>
+                                                <FilterDropdown label="G. Socioeconómico" options={options.gse} selected={selectedGSE} onChange={setSelectedGSE} />
+                                                <FilterDropdown label="Déficit" options={options.deficit} selected={selectedDeficit} onChange={setSelectedDeficit} />
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             )}
-                        </main>
-                    </div>
-
-                    <footer className="mt-20 py-20 bg-slate-900 text-slate-400 text-center px-10 border-t border-white/5">
-                        <div className="flex flex-col items-center gap-10">
-                            <div className="bg-white p-3 rounded-2xl shadow-xl grayscale opacity-50">
-                                <img src="https://cchc.cl/documents/431409/0/logoCChC.png/002fea99-2039-beec-02a7-a92335532d6f?t=1695346405910" alt="Logo" className="h-10" />
-                            </div>
-                            <div className="space-y-4">
-                                <p className="text-[10px] font-black uppercase tracking-[0.5em]">Cámara Chilena de la Construcción - Sede Maule</p>
-                                <p className="text-[9px] opacity-40 max-w-lg leading-relaxed mx-auto font-medium">Plataforma de visualización de datos de vivienda región del Maule. Basado en registros administrativos oficiales y encuestas regionales. Prohibida su reproducción total o parcial sin autorización.</p>
-                            </div>
-                            <div className="flex gap-8 opacity-20">
-                                <Icon name="Activity" size={24} />
-                                <Icon name="Database" size={24} />
-                                <Icon name="ShieldCheck" size={24} />
-                                <Icon name="Cpu" size={24} />
-                            </div>
                         </div>
-                    </footer>
+
+                        {activeTab === 'analisis' ? (
+                            <div className="space-y-6 animate-in">
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                    <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-0.5 rounded border border-blue-200">DATOS AÑO {selectedYear}</span>
+                                    {Object.values(interactiveFilters).some(x => x) && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-gray-500 font-medium">Filtros activos:</span>
+                                            {Object.entries(interactiveFilters).map(([k, v]) => v && <span key={k} className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded border border-indigo-200 flex items-center gap-1">{v}<button onClick={() => toggleInteractive(k, v)}><Icon name="x" size={12} /></button></span>)}
+                                            <button onClick={clearInteractive} className="text-xs text-red-500 underline ml-2">Limpiar todo</button>
+                                        </div>
+                                    )}
+                                </div>
+                                <Card title="Déficit Habitacional Total" value={totalReq} icon="home" subtext={`${selectedComunas.length} Comunas`} />
+                                {kpi && (
+                                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+                                        <div className="px-6 py-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 border-b" onClick={() => setIsKPIsOpen(!isKPIsOpen)}>
+                                            <h2 className="font-bold text-lg">Variación respecto a {kpi.hasPrev ? kpi.prevYear : 'año anterior'}</h2>
+                                            <Icon name={isKPIsOpen ? 'minimize-2' : 'maximize-2'} size={18} />
+                                        </div>
+                                        {isKPIsOpen && (
+                                            <div className="p-6 bg-slate-50/50">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                                    <KPICard title="Déficit Habitacional Total" value={kpi.total.value} prevValue={kpi.hasPrev ? kpi.total.prev : null} isTotal />
+                                                    {kpi.components.map(c => <KPICard key={c.name} title={c.name} value={c.value} prevValue={kpi.hasPrev ? c.prev : null} />)}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <ChartCard title="Componentes del Déficit" icon="alert-circle" iconColor="text-amber-500">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={dataByDef}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
+                                                <YAxis /><RechartsTooltip formatter={fmt} />
+                                                <Bar dataKey="value" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={60} onClick={e => toggleInteractive('deficit', e.name)} cursor="pointer" />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </ChartCard>
+                                    <ChartCard title="Por Grupo Socioeconómico" icon="users" iconColor="text-emerald-500">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie data={dataByGSE} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" onClick={e => toggleInteractive('gse', e.name)} cursor="pointer">
+                                                    {dataByGSE.map((e, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                                                </Pie>
+                                                <RechartsTooltip formatter={fmt} /><Legend verticalAlign="bottom" height={36} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </ChartCard>
+                                </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <ChartCard title="Sexo del Jefe de Hogar" icon="user" iconColor="text-indigo-500">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={dataBySexo}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                <XAxis dataKey="name" tick={{ fontSize: 11 }} /><YAxis /><RechartsTooltip formatter={fmt} />
+                                                <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={60} onClick={e => toggleInteractive('sexo', e.name)} cursor="pointer">
+                                                    {dataBySexo.map((e, i) => <Cell key={i} fill={SEXO_COLORS[i % SEXO_COLORS.length]} />)}
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </ChartCard>
+                                    <ChartCard title="Por Zona (Urbano / Rural)" icon="tree-pine" iconColor="text-sky-500">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie data={dataByZona} cx="50%" cy="50%" outerRadius={100} dataKey="value" onClick={e => toggleInteractive('zona', e.name)} cursor="pointer">
+                                                    {dataByZona.map((e, i) => <Cell key={i} fill={ZONA_COLORS[i % ZONA_COLORS.length]} />)}
+                                                </Pie>
+                                                <RechartsTooltip formatter={fmt} /><Legend verticalAlign="bottom" height={36} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </ChartCard>
+                                </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <ChartCard title="Tipo de Hogar" icon="layout-list" iconColor="text-purple-500">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={dataByTipo} layout="vertical">
+                                                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                                <XAxis type="number" /><YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} interval={0} />
+                                                <RechartsTooltip formatter={fmt} /><Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} onClick={e => toggleInteractive('tipoHogar', e.name)} cursor="pointer" />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </ChartCard>
+                                    <ChartCard title="Nivel Educacional" icon="graduation-cap" iconColor="text-teal-500">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie data={dataByEduc} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" onClick={e => toggleInteractive('educacion', e.name)} cursor="pointer">
+                                                    {dataByEduc.map((e, i) => <Cell key={i} fill={COLORS[(i + 3) % COLORS.length]} />)}
+                                                </Pie>
+                                                <RechartsTooltip formatter={fmt} /><Legend verticalAlign="bottom" height={36} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </ChartCard>
+                                </div>
+                                <ChartCard title="Distribución Geográfica" icon="map" iconColor="text-blue-500" containerHeight="" customStyle={{ height: Math.max(350, dataByComuna.length * 40) + 'px' }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={dataByComuna} layout="vertical" margin={{ left: 40, right: 30 }}>
+                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                            <XAxis type="number" /><YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11 }} />
+                                            <RechartsTooltip formatter={fmt} /><Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} onClick={e => toggleInteractive('comuna', e.name)} cursor="pointer" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </ChartCard>
+                            </div>
+                        ) : (
+                            <div className="space-y-6 animate-in">
+                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                                    <div className="flex justify-between items-end mb-6">
+                                        <div><h3 className="text-xl font-bold text-gray-800">Matriz Comparativa Anual</h3><p className="text-gray-500 text-sm">Evolución histórica por comuna.</p></div>
+                                        <div className="flex gap-2">{options.years.map((y, i) => <span key={y} className="text-xs font-bold px-2 py-1 rounded bg-gray-100" style={{ color: COLORS[i % COLORS.length] }}>● {y}</span>)}</div>
+                                    </div>
+                                    <div className="h-[500px] w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={comparison} margin={{ bottom: 80 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} tick={{ fontSize: 10 }} /><YAxis /><RechartsTooltip formatter={v => new Intl.NumberFormat('es-CL').format(v)} /><Legend verticalAlign="top" />
+                                                {options.years.map((y, i) => <Bar key={y} dataKey={y} fill={COLORS[i % COLORS.length]} name={`Año ${y}`} radius={[2, 2, 0, 0]} />)}
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                    <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-gray-700">Detalle de Datos</h3><button className="text-blue-600 font-medium flex items-center gap-1"><Icon name="download" size={16} /> Exportar CSV</button></div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm text-left text-gray-500">
+                                            <thead className="text-xs text-gray-700 uppercase bg-gray-50"><tr><th className="px-6 py-3">Provincia</th><th className="px-6 py-3">Comuna</th>{options.years.map(y => <th key={y} className="px-6 py-3 text-right">{y}</th>)}<th className="px-6 py-3 text-right">Variación</th></tr></thead>
+                                            <tbody>
+                                                {comparison.map((r, i) => {
+                                                    const v = options.years.map(y => r[y] || 0);
+                                                    const d = v[v.length - 1] - v[0];
+                                                    return (<tr key={i} className="bg-white border-b hover:bg-gray-50"><td className="px-6 py-4 font-medium text-gray-900">{r.provincia}</td><td className="px-6 py-4">{r.name}</td>{options.years.map(y => <td key={y} className="px-6 py-4 text-right font-mono">{r[y] ? r[y].toLocaleString('es-CL') : '-'}</td>)}<td className={`px-6 py-4 text-right font-bold ${d > 0 ? 'text-red-500' : 'text-green-500'}`}>{v.length > 1 && (d > 0 ? '+' : '')}{d.toLocaleString('es-CL')}</td></tr>);
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
                 </div>
             );
         }

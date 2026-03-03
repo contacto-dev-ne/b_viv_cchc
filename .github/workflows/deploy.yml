@@ -12,8 +12,10 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Inject Secrets
+        env:
+          POWER_AUTOMATE_URL: ${{ secrets.POWER_AUTOMATE_URL }}
         run: |
-          sed -i "s|{{POWER_AUTOMATE_URL}}|${{ secrets.POWER_AUTOMATE_URL }}|g" Balance_vivienda.html
+          python3 -c "import os; content = open('Balance_vivienda.html').read(); open('Balance_vivienda.html', 'w').write(content.replace('{{POWER_AUTOMATE_URL}}', os.environ['POWER_AUTOMATE_URL']))"
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4

@@ -13,8 +13,7 @@ jobs:
 
       - name: Inject Secrets
         run: |
-          sed -i "s|{{VITE_GOOGLE_API_KEY}}|${{ secrets.VITE_GOOGLE_API_KEY }}|g" Balance_vivienda.html
-          sed -i "s|{{VITE_HOUSING_SHEET_ID}}|${{ secrets.VITE_HOUSING_SHEET_ID }}|g" Balance_vivienda.html
+          sed -i "s|{{POWER_AUTOMATE_URL}}|${{ secrets.POWER_AUTOMATE_URL }}|g" Balance_vivienda.html
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4

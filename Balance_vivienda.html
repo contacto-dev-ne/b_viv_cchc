@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Balance de Vivienda - Maule</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
@@ -72,7 +71,6 @@
 <body class="bg-slate-50 text-slate-800">
     <div id="root"></div>
 
-    <!-- Librerías Externas -->
     <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
@@ -92,7 +90,7 @@
          * La URL de Power Automate se inyecta como secret durante el deploy.
          */
         const CONFIG = {
-            powerAutomateUrl: '{{POWER_AUTOMATE_URL}}'
+            powerAutomateUrl: 'https://default6780ef6e6e8c4ac2b2bc18eb02f617.a6.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/13d982c2836e4af18bfdaf56f68c1744/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=M71A-pgTuzqAVcaQkf2IC6c4p2UYWqfHBaTOtXMO3Ok'
         };
 
         const MAULE_STRUCTURE = {
